@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exogenesis Corporation: Base-E01</title>
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- Viewport Principal -->
+        <div id="viewport">
+            <div id="panorama-track">
+                <div id="hotspot-layer"></div>
+            </div>
+            
+            <!-- Camadas de Ambience -->
+            <canvas id="ambient-particles"></canvas>
+            <div id="vignette-overlay"></div>
+            <div id="scanline-overlay"></div>
+            <div id="scan-wave"></div>
+            
+            <!-- Tooltip Flutuante -->
+            <div id="hover-tooltip"></div>
+        </div>
+
+        <!-- Interface HUD -->
+        <div id="ui-container">
+            <div id="text-box">
+                <p id="game-text"></p>
+            </div>
+
+            <div id="action-panel">
+                <div id="navigation-coords">
+                    <span id="current-location">LOCAL: PONTE DE COMANDO</span>
+                </div>
+                <div id="options-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
