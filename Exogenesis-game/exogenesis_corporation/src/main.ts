@@ -135,9 +135,9 @@ const rooms: Record<string, Room> = {
             },
             {
                 id: 'window', 
-                label: 'Observar planeta Glisere22A5',
+                label: 'Observar planeta SAPX-2090',
                 top: '12%', left: '18%', width: '36%', height: '22%',
-                action: () => game.setText("A visão da janela revela Glisere22A5. Um planeta desértico envolto em poeira. A Base-E01 está situada no setor norte.")
+                action: () => game.setText("A visão da janela revela SAPX-2090. Um planeta desértico envolto em poeira. A Base-E01 está situada no setor norte.")
             },
             {
                 id: 'door_to_hallway', 
