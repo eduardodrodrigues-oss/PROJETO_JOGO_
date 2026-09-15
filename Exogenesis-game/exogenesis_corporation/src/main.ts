@@ -157,7 +157,7 @@ const rooms: Record<string, Room> = {
         hotspots: [
             {
                 id: 'door_to_bridge', 
-                label: 'Retornar à Ponte de Comando',
+                label: 'Caminhar para Ponte de Comando',
                 top: '25%', left: '8%', width: '14%', height: '60%',
                 action: () => game.changeRoom('bridge')
             },
@@ -169,7 +169,7 @@ const rooms: Record<string, Room> = {
             },
             {
                 id: 'door_to_lounge', 
-                label: 'Avançar para o Salão Central (Lounge da Tripulação)',
+                label: 'Caminhar para o Salão Central',
                 top: '30%', left: '50%', width: '18%', height: '45%',
                 action: () => game.changeRoom('lounge')
             }
@@ -218,7 +218,7 @@ const rooms: Record<string, Room> = {
             },
             {
                 id: 'center_door_hallway',
-                label: 'Voltar ao Corredor Principal',
+                label: 'Caminhar para Corredor Principal',
                 top: '38%', left: '38%', width: '8%', height: '25%',
                 action: () => game.changeRoom('hallway')
             }
@@ -264,7 +264,7 @@ const rooms: Record<string, Room> = {
             },
             {
                 id: 'back_to_lounge',
-                label: 'Retornar ao Salão Central (Lounge)',
+                label: 'Caminhar para Salão Central (Lounge)',
                 top: '82%', left: '30%', width: '40%', height: '18%',
                 action: () => game.changeRoom('lounge')
             }
@@ -310,7 +310,7 @@ const rooms: Record<string, Room> = {
             },
             {
                 id: 'back_to_corredor_tecnico',
-                label: 'Sair para o Corredor Técnico',
+                label: 'Caminhar para Corredor Técnico',
                 top: '80%', left: '25%', width: '50%', height: '20%',
                 action: () => game.changeRoom('corredor_tecnico')
             }
@@ -374,7 +374,7 @@ const rooms: Record<string, Room> = {
             },
             {
                 id: 'voltar_corredor_tecnico_cie',
-                label: 'Retornar ao Corredor Técnico',
+                label: 'Caminhar para Corredor Técnico',
                 top: '80%', left: '2%', width: '20%', height: '18%',
                 action: () => game.changeRoom('corredor_tecnico')
             }
@@ -426,7 +426,7 @@ const rooms: Record<string, Room> = {
             },
             {
                 id: 'door_back_hallway', 
-                label: 'Voltar ao Corredor Principal',
+                label: 'Caminhar para Corredor Principal',
                 top: '80%', left: '35%', width: '30%', height: '20%',
                 action: () => game.changeRoom('hallway')
             }
@@ -488,8 +488,8 @@ const rooms: Record<string, Room> = {
             },
             {
                 id: 'door_back_comodo1', 
-                label: 'Retornar ao Escritório (Cômodo 1)',
-                top: '82%', left: '30%', width: '40%', height: '18%',
+                label: 'Caminhar para Escritório',
+                top: '18%', left: '40%', width: '30%', height: '82%',
                 action: () => game.changeRoom('comodo1')
             }
         ]
@@ -577,7 +577,7 @@ class ParticleSystem {
 // --- CLASSE 3: ENGINE PRINCIPAL DO JOGO ---
 
 class PointAndClickEngine {
-    private currentRoomId: string = 'bridge';
+    private currentRoomId: string = 'quarto13';
 
     // Estado do jogo e inventário
     private inventory: Item[] = [];
@@ -619,7 +619,154 @@ class PointAndClickEngine {
         this.initTooltipFollow();
         new ParticleSystem('ambient-particles');
         this.render();
+        // Exemplo no final do constructor() ou método init():
+        this.startIntroCutscene();
     }
+    
+
+    public showThought(text: string) {
+    // Remove qualquer pensamento anterior ativo
+    const existingThought = document.getElementById('thought-overlay');
+    if (existingThought) existingThought.remove();
+
+    // Faixa com gradiente escuro de sombra no rodapé
+    const thoughtOverlay = document.createElement('div');
+    thoughtOverlay.id = 'thought-overlay';
+    thoughtOverlay.style.cssText = `
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100vw;
+        height: 140px;
+        background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.75) 60%, transparent 100%);
+        z-index: 500;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding-bottom: 30px;
+        box-sizing: border-box;
+        cursor: pointer;
+        transition: opacity 0.5s ease;
+    `;
+
+    // Texto com tom itálico/melancólico para pensamento
+    const textEl = document.createElement('p');
+    textEl.style.cssText = `
+        color: #d2d8e0;
+        font-family: 'VT323', monospace;
+        font-size: 26px;
+        font-style: italic;
+        letter-spacing: 2px;
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
+        margin: 0;
+        text-align: center;
+        padding: 0 20px;
+        pointer-events: none;
+    `;
+    textEl.innerText = `💭 "${text}"`;
+
+    thoughtOverlay.appendChild(textEl);
+    document.body.appendChild(thoughtOverlay);
+
+    // Some ao clicar na sombra ou na tela
+    thoughtOverlay.onclick = () => {
+        thoughtOverlay.style.opacity = '0';
+        setTimeout(() => thoughtOverlay.remove(), 500);
+    };
+}
+
+    public startIntroCutscene() {
+    // Carrega a fonte estilo terminal
+    if (!document.getElementById('retro-font-link')) {
+        const fontLink = document.createElement('link');
+        fontLink.id = 'retro-font-link';
+        fontLink.rel = 'stylesheet';
+        fontLink.href = 'https://fonts.googleapis.com/css2?family=VT323&display=swap';
+        document.head.appendChild(fontLink);
+    }
+
+    // Tela inteira preta
+    const overlay = document.createElement('div');
+    overlay.id = 'intro-cutscene';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        background: #000000;
+        z-index: 9999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 40px;
+        box-sizing: border-box;
+    `;
+
+    // Elemento para o texto com preservação obrigatória de espaços (white-space: pre-wrap)
+    const textEl = document.createElement('div');
+    textEl.style.cssText = `
+        max-width: 900px;
+        color: #ffffff;
+        font-family: 'VT323', monospace;
+        font-size: 32px;
+        letter-spacing: 2px;
+        line-height: 1.8;
+        text-align: center;
+        white-space: pre-wrap;
+        word-break: break-word;
+    `;
+
+    overlay.appendChild(textEl);
+    document.body.appendChild(overlay);
+
+    const text1 = "... Estamos em 2118... a tripulação, a minha tripulação está viajando pelo espaço vasto, escuro, a famosa caixa de areia, solitária nos leva para o planeta onde o fundador foi visto pela última vez. Há mais de 5 meses que não recebemos retorno de suas mensagens...";
+    const text2 = "só não sabíamos onde ele tinha se metido!";
+
+    // Efeito de máquina de escrever usando textContent (preserva espaços perfeitamente)
+    const typeWriter = (text: string, element: HTMLElement, speed: number = 35): Promise<void> => {
+        return new Promise((resolve) => {
+            element.textContent = '';
+            let i = 0;
+            const timer = setInterval(() => {
+                if (i < text.length) {
+                    element.textContent += text.charAt(i);
+                    i++;
+                } else {
+                    clearInterval(timer);
+                    resolve();
+                }
+            }, speed);
+        });
+    };
+
+    // Sequência da animação
+    const runCutscene = async () => {
+        // 1. Digita o primeiro texto
+        await typeWriter(text1, textEl, 35);
+
+        // 2. Aguarda 5 segundos na tela
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+
+        // 3. Limpa o texto instantaneamente
+        textEl.textContent = '';
+
+        // 4. Digita a frase final
+        await typeWriter(text2, textEl, 45);
+
+        // 5. Aguarda 2.5 segundos
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+
+        
+        // 6. CORTE BRUSCO direto para o jogo com o pensamento
+        overlay.remove();
+        this.currentRoomId = 'dormitorio';
+        this.render();
+
+        // Exibe a sombra de pensamento no rodapé
+        this.showThought("Últimas horas de viagem... como será que estão as coisas essas horas?");
+    };
+
+    runCutscene();
+}
+
     public openConsoleOverlay() {
     if (this.consoleOverlayEl) return;
 
@@ -1231,33 +1378,35 @@ public renderInventory() {
     }
 
     public interactRightDoorComodo1() {
-        this.stopLucianoTalking();
-        this.clearOptions();
+    this.stopLucianoTalking();
+    this.clearOptions();
 
-        if (this.getFlag('comodo1_right_door_unlocked')) {
-            this.changeRoom('setor_confidencial');
-            return;
-        }
-
-        if (this.hasItem('cartao_acesso_lvl2')) {
-            this.setText("PORTA SELADA: O leitor biométrico pisca em vermelho. Requer autorização de segurança.");
-        
-            const btn = document.createElement('button');
-            btn.className = 'action-btn';
-            btn.innerText = '💳 Usar Cartão de Acesso Nível 2';
-            btn.onclick = () => {
-            sounds.playClick();
-                this.triggerHandGrab();
-                this.setFlag('comodo1_right_door_unlocked', true);
-                this.clearOptions();
-                this.setText("[BIP! BIP!] Autorização Nível 2 Aceita! Trava liberada. Clique novamente na porta para entrar.");
-            };
-            this.optionsContainer.appendChild(btn);
-            this.updateUIState();
-        } else {
-            this.setText("PORTA SELADA: [ALARME SILENCIOSO] Acesso bloqueado. Sistema requer autorização de segurança nível 2.");
-        }
+    if (this.getFlag('comodo1_right_door_unlocked')) {
+        this.changeRoom('setor_confidencial');
+        return;
     }
+
+    if (this.hasItem('cartao_acesso_lvl2')) {
+        this.setText("PORTA SELADA: O leitor biométrico pisca em vermelho. Requer autorização de segurança.");
+    
+        const btn = document.createElement('button');
+        btn.className = 'action-btn';
+        btn.innerText = '💳 Usar Cartão de Acesso Nível 2';
+        btn.onclick = () => {
+            sounds.playClick();
+            this.triggerHandGrab();
+            this.setFlag('comodo1_right_door_unlocked', true);
+            this.clearOptions();
+            this.setText("[BIP! BIP!] Autorização Nível 2 Aceita! Trava liberada. Clique novamente na porta para entrar.");
+        };
+        this.optionsContainer.appendChild(btn);
+        this.updateUIState();
+    } else {
+        sounds.playClick();
+        this.setText("PORTA SELADA: Acesso bloqueado. Sistema requer autorização de segurança Nível 2.");
+        this.showThought("Onde foi parar esse cartão de acesso? Ana deve ter escondido...");
+    }
+}
     // --- CONTROLES DE MOUSE E CÂMERA ---
 
     private initCameraControls() {
