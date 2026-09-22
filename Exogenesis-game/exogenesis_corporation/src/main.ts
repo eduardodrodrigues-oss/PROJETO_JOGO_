@@ -19,8 +19,19 @@ import anaMoniqueImgUrl from './assets/ana_monique.png';
 import anaMoniqueFalandoImgUrl from './assets/ana_monique_falando.png';
 import noralmaImgUrl from './assets/noralma_costa.png';
 import noralmaFalandoImgUrl from './assets/noralma_falando.png';
-import consoleImgUrl from './assets/console_hud.png';
-import consoleActiveImgUrl from './assets/console_hud_active.png';
+import bancadaImgUrl from './assets/console_hud.png';
+import bancadaLigadaImgUrl from './assets/console_hud_active.png';
+import titleBgUrl from './assets/title_screen.png';
+import papelCodigoImgUrl from './assets/papel_codigo.png'; // Caminho para a imagem do papel
+
+import pass1Img from './assets/bancada_1.png';      // Tela com *
+import pass2Img from './assets/bancada_2.png';      // Tela com **
+import pass3Img from './assets/bancada_3.png';      // Tela com ***
+import pass4Img from './assets/bancada_4.png';      // Tela com ****
+import pass5Img from './assets/bancada_5.png';      // Tela com *****
+import pass6Img from './assets/bancada_6.png';      // Tela com ******
+
+const BANCADA_IMAGES = [bancadaImgUrl, pass1Img, pass2Img, pass3Img, pass4Img, pass5Img, pass6Img];
 // --- INTERFACES ---
 
 interface Item {
@@ -120,6 +131,7 @@ const sounds = new SoundEngine();
 // --- MAPA DE SALAS DO JOGO ---
 
 const rooms: Record<string, Room> = {
+    
     'bridge': {
         id: 'bridge',
         name: 'Ponte de Comando - Exo-Voyager',
@@ -144,9 +156,11 @@ const rooms: Record<string, Room> = {
                 label: 'Ir para o Corredor Principal',
                 top: '28%', left: '82%', width: '12%', height: '58%',
                 action: () => game.changeRoom('hallway')
-            }
+            },
+            
         ]
     },
+    
 
     'hallway': {
         id: 'hallway',
@@ -283,6 +297,12 @@ const rooms: Record<string, Room> = {
                 label: 'Placa Setor Médico',
                 top: '25%', left: '2%', width: '10%', height: '30%',
                 action: () => game.setText("SINALIZAÇÃO: Indica o setor de triagem e tratamento intensivo da Unidade B.")
+            },
+            {
+            id: 'pe_de_cabra_hotspot',
+            label: '🔧 Pé de Cabra',
+            top: '65%', left: '40%', width: '12%', height: '15%', // Ajuste a posição onde ele fica visível
+            action: () => game.interactPeDeCabra()
             },
             {
                 id: 'poster_health',
@@ -513,7 +533,13 @@ const rooms: Record<string, Room> = {
                 label: 'Sair para o Corredor da Ala A (Porta 13)',
                 top: '20%', left: '50%', width: '17%', height: '55%',
                 action: () => game.changeRoom('ala_a')
-            }
+            },
+            {
+            id: 'armario_dormitorio',
+            label: '🔒 Armário do Dormitório',
+            top: '20%', left: '2%', width: '18%', height: '65%', // Extrema esquerda
+            action: () => game.interactArmarioDormitorio()
+            },
         ]
     }
 };
@@ -612,6 +638,7 @@ class PointAndClickEngine {
     private retroRocketsActive: boolean = false;
     private shieldsAligned: boolean = false;
     private consoleOverlayEl: HTMLElement | null = null;
+    private consoleCodeInput: string = '';  
     constructor() {
         this.setupPlayerHand();
         this.setupInventoryUI();
@@ -620,9 +647,411 @@ class PointAndClickEngine {
         new ParticleSystem('ambient-particles');
         this.render();
         // Exemplo no final do constructor() ou método init():
-        this.startIntroCutscene();
+        
+        this.render(); 
+
+        // 2. Chama a Tela Inicial no FINAL para ficar por cima de tudo:
+        this.startTitleScreen();
+        // Deteta cliques no item 'papel_codigo' dentro do inventário
+        document.addEventListener('click', (e) => {
+            const target = e.target as HTMLElement;
+    
+    // Se o elemento clicado (ou o elemento pai) tiver o texto/id do papel do código
+        if (target && (target.innerText?.includes('Papel com Código') || target.getAttribute('data-item-id') === 'papel_codigo' || target.closest('[data-item-id="papel_codigo"]'))) {
+        this.showItemInspector(papelCodigoImgUrl, "Código anotado: 482761");
+        }
+        });
     }
     
+
+/**
+ * Lógica de processamento do Teclado Numérico da Bancada.
+ */
+private handleKeypadInput(key: string, displayEl: HTMLElement) {
+    if (!this.getFlag('alavanca_puxada')) {
+        this.setText("BANCADA DE COMANDOS: O teclado está sem energia. Puxe a alavanca primeiro!");
+        return;
+    }
+
+    if (this.getFlag('pouso_autorizado')) {
+        this.setText("BANCADA DE COMANDOS: Sequência de pouso já foi autorizada e travada no sistema.");
+        return;
+    }
+
+    if (key === 'C') {
+        this.consoleCodeInput = '';
+        displayEl.innerText = '------';
+        return;
+    }
+
+    if (key === '↵') {
+        this.validateConsoleCode(displayEl);
+        return;
+    }
+
+    if (this.consoleCodeInput.length < 6) {
+        this.consoleCodeInput += key;
+        displayEl.innerText = this.consoleCodeInput.padEnd(6, '-');
+    }
+}
+
+/**
+ * Validação da senha de 6 dígitos no Console (Código correto: 482761).
+ */
+private validateConsoleCode(displayEl: HTMLElement) {
+    const TARGET_CODE = '482761';
+
+    if (this.consoleCodeInput === TARGET_CODE) {
+        this.setFlag('pouso_autorizado', true);
+        displayEl.style.color = '#00ff66';
+        displayEl.innerText = 'ACEITO';
+        sounds.playClick();
+
+        this.setText("CÓDIGO ACEITO! Protocolo de Pouso Desbloqueado. Iniciando Reentrada Atmosférica...");
+        this.triggerLandingSequence();
+
+        setTimeout(() => {
+            this.closeConsoleOverlay();
+        }, 1500);
+    } else {
+        displayEl.style.color = '#ff3333';
+        displayEl.innerText = 'ERRO';
+        sounds.playClick();
+        this.setText("CÓDIGO INCORRETO! Acesso negado pela matriz de controle.");
+
+        setTimeout(() => {
+            this.consoleCodeInput = '';
+            displayEl.style.color = '#00ffaa';
+            displayEl.innerText = '------';
+        }, 1200);
+    }
+}
+    public showItemInspector(imageUrl: string, description?: string) {
+    const existing = document.getElementById('item-inspector');
+    if (existing) existing.remove();
+
+    // Modal escuro em ecrã inteiro com efeito de desfoque (Inspector)
+    const overlay = document.createElement('div');
+    overlay.id = 'item-inspector';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        background: rgba(0, 0, 0, 0.88);
+        backdrop-filter: blur(5px);
+        z-index: 100000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        user-select: none;
+    `;
+
+    // Imagem do papel centralizada com sombra projetada
+    const img = document.createElement('img');
+    img.src = imageUrl;
+    img.style.cssText = `
+        max-width: 85vw;
+        max-height: 65vh;
+        object-fit: contain;
+        filter: drop-shadow(0px 15px 30px rgba(0, 0, 0, 0.9));
+        transition: transform 0.2s ease;
+    `;
+
+    // Legenda/Texto descritivo
+    const desc = document.createElement('div');
+    desc.style.cssText = `
+        margin-top: 20px;
+        color: #ffffff;
+        font-family: 'VT323', monospace;
+        font-size: 24px;
+        letter-spacing: 2px;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 8px 24px;
+        border: 1px solid #00ffaa;
+        border-radius: 4px;
+        box-shadow: 0 0 15px rgba(0, 255, 170, 0.2);
+    `;
+    desc.innerText = description || "Código de Acesso: 482761";
+
+    const hint = document.createElement('span');
+    hint.style.cssText = `
+        margin-top: 12px;
+        color: #888888;
+        font-family: 'VT323', monospace;
+        font-size: 18px;
+        letter-spacing: 1px;
+    `;
+    hint.innerText = "[ Clique para fechar ]";
+
+    overlay.appendChild(img);
+    overlay.appendChild(desc);
+    overlay.appendChild(hint);
+
+    // Clicar em qualquer parte fecha a visualização
+    overlay.onclick = () => {
+        try { sounds.playClick(); } catch (e) {}
+        overlay.remove();
+    };
+
+    document.body.appendChild(overlay);
+}
+    public startTitleScreen() {
+    const createOverlay = () => {
+        const existing = document.getElementById('title-screen');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'title-screen';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: #000000 url('${titleBgUrl}') center/cover no-repeat;
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            padding-bottom: 60px;
+            box-sizing: border-box;
+        `;
+
+        const startBtn = document.createElement('button');
+        startBtn.innerText = 'INICIAR JORNADA';
+        startBtn.style.cssText = `
+            background: rgba(0, 0, 0, 0.6);
+            color: #ffffff;
+            border: none;
+            outline: none;
+            padding: 10px 28px;
+            font-family: 'VT323', monospace;
+            font-size: 22px;
+            letter-spacing: 3px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            text-transform: uppercase;
+            border-radius: 4px;
+        `;
+
+        startBtn.onmouseenter = () => {
+            startBtn.style.color = '#00ffaa';
+            startBtn.style.background = 'rgba(0, 0, 0, 0.85)';
+            startBtn.style.textShadow = '0 0 10px rgba(0, 255, 170, 0.8)';
+        };
+
+        startBtn.onmouseleave = () => {
+            startBtn.style.color = '#ffffff';
+            startBtn.style.background = 'rgba(0, 0, 0, 0.6)';
+            startBtn.style.textShadow = 'none';
+        };
+
+        // Ao clicar: remove o menu e exibe a tela de brilho (a cutscene NÃO é chamada aqui)
+        startBtn.onclick = () => {
+            try { sounds.playClick(); } catch (e) {}
+            overlay.remove();
+            this.showBrightnessSettings(() => {
+                this.startIntroCutscene(); // Cutscene só inicia APÓS confirmar o brilho
+            });
+        };
+
+        overlay.appendChild(startBtn);
+        document.body.appendChild(overlay);
+    };
+
+    if (document.body) {
+        createOverlay();
+    } else {
+        window.addEventListener('DOMContentLoaded', createOverlay);
+    }
+}
+
+public showBrightnessSettings(onConfirm: () => void) {
+    const existing = document.getElementById('brightness-screen');
+    if (existing) existing.remove();
+
+    // Aplica o brilho inicial em 200%
+    document.body.style.filter = 'brightness(200%)';
+
+    const overlay = document.createElement('div');
+    overlay.id = 'brightness-screen';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        background: rgba(0, 0, 0, 0.95);
+        z-index: 100000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        font-family: 'VT323', monospace;
+        color: #ffffff;
+    `;
+
+    const title = document.createElement('h2');
+    title.innerText = 'AJUSTE DE BRILHO';
+    title.style.cssText = `
+        font-size: 32px;
+        letter-spacing: 3px;
+        margin: 0;
+        color: #00ffaa;
+    `;
+
+    const desc = document.createElement('p');
+    desc.innerText = 'Ajuste a intensidade do brilho para a melhor experiência:';
+    desc.style.cssText = `
+        font-size: 20px;
+        color: #cccccc;
+        margin: 0;
+    `;
+
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.min = '50';
+    slider.max = '200';
+    slider.value = '200';
+    slider.style.cssText = `
+        width: 280px;
+        cursor: pointer;
+        accent-color: #00ffaa;
+    `;
+
+    const valueDisplay = document.createElement('span');
+    valueDisplay.innerText = '200%';
+    valueDisplay.style.cssText = 'font-size: 24px; letter-spacing: 2px;';
+
+    slider.oninput = () => {
+        const val = slider.value;
+        valueDisplay.innerText = `${val}%`;
+        document.body.style.filter = `brightness(${val}%)`;
+    };
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.innerText = 'CONFIRMAR';
+    confirmBtn.style.cssText = `
+        background: rgba(0, 0, 0, 0.6);
+        color: #ffffff;
+        border: 1px solid #00ffaa;
+        padding: 8px 28px;
+        font-family: 'VT323', monospace;
+        font-size: 22px;
+        letter-spacing: 2px;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+        margin-top: 10px;
+    `;
+
+    confirmBtn.onmouseenter = () => {
+        confirmBtn.style.background = '#00ffaa';
+        confirmBtn.style.color = '#000000';
+    };
+
+    confirmBtn.onmouseleave = () => {
+        confirmBtn.style.background = 'rgba(0, 0, 0, 0.6)';
+        confirmBtn.style.color = '#ffffff';
+    };
+
+    confirmBtn.onclick = () => {
+        try { sounds.playClick(); } catch (e) {}
+        overlay.remove();
+        onConfirm(); // Inicia a cutscene apenas agora
+    };
+
+    overlay.appendChild(title);
+    overlay.appendChild(desc);
+    overlay.appendChild(slider);
+    overlay.appendChild(valueDisplay);
+    overlay.appendChild(confirmBtn);
+
+    document.body.appendChild(overlay);
+}
+// Guardar o código digitado
+private currentCode: string = "";
+
+// ⚙️ Ação ao clicar na alavanca da bancada (canto inferior esquerdo)
+public interactAlavancaBancada() {
+    try { sounds.playClick(); } catch (e) {}
+
+    this.setFlag('alavanca_puxada', true);
+    this.setText("Você puxou a alavanca para baixo! O teclado do terminal foi energizado.");
+}
+
+// 🔢 Ação ao clicar nos números da bancada
+public pressBenchKeypad(digit: string) {
+    // 1. Trava: Se a alavanca AINDA NÃO foi puxada
+    if (!this.getFlag('alavanca_puxada')) {
+        this.showThought("Lembro que preciso puxar a alavanca para conseguir mexer no código de acesso...");
+        return;
+    }
+
+    try { sounds.playClick(); } catch (e) {}
+
+    if (this.currentCode.length >= 6) return;
+
+    this.currentCode += digit;
+    const count = this.currentCode.length;
+
+    // Atualiza a imagem da tela da bancada com a versão correspondente de asteriscos (*, **, ***, etc.)
+    this.updateBenchImage(BANCADA_IMAGES[count]);
+
+    // 2. Quando completar os 6 dígitos:
+    if (this.currentCode.length === 6) {
+        setTimeout(() => {
+            if (this.currentCode === '482761') {
+                this.setFlag('sistema_desbloqueado', true);
+                this.setText("ACESSO CONCEDIDO! Sistema de navegação liberado.");
+            } else {
+                this.setText("CÓDIGO INCORRETO! Reiniciando terminal...");
+                this.currentCode = "";
+                this.updateBenchImage(BANCADA_IMAGES[0]); // Volta para a tela inicial sem asteriscos
+            }
+        }, 500);
+    }
+}
+
+// Auxiliar para trocar a imagem da bancada atual
+private updateBenchImage(imgUrl: string) {
+    // Atualize o fundo da sala/modal da bancada com a nova imagem
+    const benchContainer = document.getElementById('bench-view-container'); // Use o ID do seu elemento da bancada
+    if (benchContainer) {
+        benchContainer.style.backgroundImage = `url('${imgUrl}')`;
+    }
+}
+
+// Auxiliar para trocar a imagem da tela/bancada
+public updateConsoleBgImage(imgUrl: string) {
+    const benchContainer = document.getElementById('bancada-view');
+    if (benchContainer) {
+        benchContainer.style.backgroundImage = `url('${imgUrl}')`;
+    }
+}
+
+public interactPeDeCabra() {
+    // Se o jogador já pegou o pé de cabra, não faz nada
+    if (this.hasItem('pe_de_cabra')) {
+        this.setText("Não há mais nada por aqui.");
+        return;
+    }
+
+    try { sounds.playClick(); } catch (e) {}
+
+    // Adiciona o pé de cabra ao inventário
+    this.addItem({
+        id: 'pe_de_cabra',
+        name: 'Pé de Cabra',
+        iconSymbol: '🔨',
+        description: 'Uma ferramenta pesada de ferro. Perfeita para forçar fechaduras ou armários.'
+    });
+
+    this.setText("Você pegou o pé de cabra!");
+
+    // Atualiza a tela para remover o hotspot do chão/bancada
+    this.render();
+}
 
     public showThought(text: string) {
     // Remove qualquer pensamento anterior ativo
@@ -768,104 +1197,233 @@ class PointAndClickEngine {
 }
 
     public openConsoleOverlay() {
-    if (this.consoleOverlayEl) return;
+    // Evita abrir múltiplos modais simultâneos
+    if (document.getElementById('console-modal')) return;
 
-    // Overlay modal escuro
+    // Overlay escuro de fundo
     const overlay = document.createElement('div');
     overlay.id = 'console-modal';
     overlay.style.cssText = `
-        position: fixed;
-        top: 0; left: 0; width: 100vw; height: 100vh;
-        background: rgba(0,0,0,0.92);
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
         z-index: 1000;
         display: flex;
-        flex-direction: column;
         align-items: center;
         justify-content: center;
+        backdrop-filter: blur(4px);
     `;
 
-    // Container do Cockpit HD (carrega a imagem base ou a ativada dependendo do estado)
-    const container = document.createElement('div');
-    const updateConsoleBackground = () => {
-        container.style.backgroundImage = `url('${this.retroRocketsActive ? consoleActiveImgUrl : consoleImgUrl}')`;
-    };
-
-    container.style.cssText = `
+    // Moldura Responsiva com Aspect Ratio fixo (16:9)
+    const aspectWrapper = document.createElement('div');
+    aspectWrapper.style.cssText = `
         position: relative;
-        width: 90vw;
-        height: 80vh;
-        background-size: contain;
+        width: 90%;
+        max-width: 960px;
+        aspect-ratio: 16 / 9;
+        box-shadow: 0 0 25px rgba(0, 255, 170, 0.4);
+        border: 2px solid #00ffaa;
+        border-radius: 8px;
+        overflow: hidden;
+        background-color: #050b10;
+    `;
+
+    const isLeverPowered = this.getFlag('alavanca_puxada');
+
+    // Container do Fundo da Bancada (Alterna dinamicamente a arte)
+    const benchView = document.createElement('div');
+    benchView.id = 'bancada-view';
+    benchView.style.cssText = `
+        width: 100%;
+        height: 100%;
+        background-image: url('${isLeverPowered ? bancadaLigadaImgUrl : bancadaImgUrl}');
+        background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
-        border: 2px solid #00ffaa;
-        box-shadow: 0 0 25px rgba(0, 255, 170, 0.3);
+        position: relative;
     `;
-    updateConsoleBackground();
 
-    // Indicador de Status na tela da bancada
-    const statusDisplay = document.createElement('div');
-    statusDisplay.style.cssText = `
-        position: absolute; top: 15px; left: 20px;
-        color: #00ffaa; font-family: monospace; font-size: 15px;
-        background: rgba(0,0,0,0.8); padding: 8px 15px; border: 1px solid #00ffaa;
-        border-radius: 4px; pointer-events: none; z-index: 1002;
+    // --- DISPLAY DE TEXTO DA SENHA (Centralizado na caixa do monitor) ---
+    const display = document.createElement('div');
+    display.id = 'console-code-display';
+    display.style.cssText = `
+        position: absolute;
+        top: 27.5%;
+        left: 41.5%;
+        width: 17%;
+        height: 4%;
+        color: ${isLeverPowered ? '#00ffaa' : 'transparent'};
+        font-family: monospace;
+        font-size: 16px;
+        font-weight: bold;
+        letter-spacing: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        text-shadow: ${isLeverPowered ? '0 0 8px #00ffaa' : 'none'};
     `;
-    
-    const updateHUD = () => {
-        statusDisplay.innerText = `CASCO: ${this.hullHealth}% | ESCUDOS: ${this.shieldsAligned ? 'OK' : 'DESALINHADOS'} | RETROS: ${this.retroRocketsActive ? 'LIGADOS' : 'DESLIGADOS'}`;
-    };
-    updateHUD();
+    display.innerText = isLeverPowered ? (this.consoleCodeInput || '------') : '';
+    benchView.appendChild(display);
 
-    // Botão Fechar / Sair
-    const btnExit = document.createElement('button');
-    btnExit.innerText = '✖ LEVANTAR DA BANCADA';
-    btnExit.className = 'action-btn';
-    btnExit.style.cssText = 'position: absolute; top: 15px; right: 15px; z-index: 1002;';
-    btnExit.onclick = () => this.closeConsoleOverlay();
-
-    // Hotspot 1: Alavanca da Esquerda (Invisível)
-    const btnLever = document.createElement('button');
-    btnLever.title = 'Alavanca de Propulsão / Retrofoguetes';
+    // --- HOTSPOT 1: Alavanca Principal (Invisível) ---
+    const btnLever = document.createElement('div');
     btnLever.style.cssText = `
-        position: absolute; top: 58%; left: 3%; width: 15%; height: 25%;
-        background: transparent; border: none; outline: none; cursor: pointer;
+        position: absolute;
+        top: 52%;
+        left: 2%;
+        width: 14%;
+        height: 38%;
+        cursor: pointer;
+        border: none;
+        background: transparent;
     `;
+    btnLever.title = 'Alavanca de Energização';
+
     btnLever.onclick = () => {
         sounds.playClick();
-        this.retroRocketsActive = !this.retroRocketsActive;
-        updateConsoleBackground(); // Troca a imagem do cockpit instantaneamente
-        updateHUD();
-        this.checkLandingSafety();
+        if (!this.getFlag('alavanca_puxada')) {
+            this.setFlag('alavanca_puxada', true);
+            
+            // Ativa a arte iluminada da bancada (console_hud_active.png)
+            benchView.style.backgroundImage = `url('${bancadaLigadaImgUrl}')`;
+            display.style.color = '#00ffaa';
+            display.style.textShadow = '0 0 8px #00ffaa';
+            display.innerText = this.consoleCodeInput || '------';
+            
+            this.setText("BANCADA DE COMANDOS: Sistema energizado! O painel de controle foi ativado.");
+        } else {
+            this.setText("BANCADA DE COMANDOS: Alavanca principal já se encontra na posição ATIVA.");
+        }
     };
+    benchView.appendChild(btnLever);
 
-    // Hotspot 2: Painel Central (Invisível)
-    const btnCenterMatrix = document.createElement('button');
-    btnCenterMatrix.title = 'Estabilizar Matriz de Escudos';
-    btnCenterMatrix.style.cssText = `
-        position: absolute; top: 60%; left: 36%; width: 28%; height: 22%;
-        background: transparent; border: none; outline: none; cursor: pointer;
+    // --- HOTSPOT 2: Mapeamento Tecla por Tecla do Teclado do Monitor ---
+    const keyboardContainer = document.createElement('div');
+    keyboardContainer.style.cssText = `
+        position: absolute;
+        top: 36%;
+        left: 33.2%;
+        width: 33.6%;
+        height: 28%;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        border: none;
+        background: transparent;
     `;
-    btnCenterMatrix.onclick = () => {
-        sounds.playClick();
-        this.shieldsAligned = true;
-        updateHUD();
-        this.checkLandingSafety();
+
+    // Função auxiliar para criar hotspots de teclas transparentes
+    const createKey = (keyLabel: string, flexValue: string = '1') => {
+        const keyEl = document.createElement('div');
+        keyEl.style.cssText = `
+            flex: ${flexValue};
+            height: 100%;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            border-radius: 2px;
+            transition: background 0.1s ease;
+        `;
+        
+        // Efeito sutil ao passar o mouse quando energizado
+        keyEl.onmouseenter = () => {
+            if (this.getFlag('alavanca_puxada')) {
+                keyEl.style.background = 'rgba(0, 255, 170, 0.2)';
+                sounds.playHover();
+            }
+        };
+        keyEl.onmouseleave = () => {
+            keyEl.style.background = 'transparent';
+        };
+
+        keyEl.onclick = () => {
+            sounds.playClick();
+            // Se a alavanca NÃO foi puxada, exibe o pensamento
+            if (!this.getFlag('alavanca_puxada')) {
+                this.showThought("Lembro que sempre puxei primeiro a alavanca...");
+                return;
+            }
+            // Se energizado, envia a digitação da tecla
+            this.handleKeypadInput(keyLabel, display);
+        };
+        return keyEl;
     };
 
-    container.appendChild(statusDisplay);
-    container.appendChild(btnLever);
-    container.appendChild(btnCenterMatrix);
-    container.appendChild(btnExit);
-    overlay.appendChild(container);
-    document.body.appendChild(overlay);
+    // Fileira 1: Teclas Numéricas (1 a 0) + Apagar (C)
+    const row1 = document.createElement('div');
+    row1.style.cssText = 'display: flex; height: 20%; gap: 2px;';
+    ['1','2','3','4','5','6','7','8','9','0','C'].forEach(k => row1.appendChild(createKey(k)));
+    keyboardContainer.appendChild(row1);
 
-    this.consoleOverlayEl = overlay;
+    // Fileira 2: Q W E R T Y U I O P
+    const row2 = document.createElement('div');
+    row2.style.cssText = 'display: flex; height: 20%; gap: 2px; padding: 0 1%;';
+    ['Q','W','E','R','T','Y','U','I','O','P'].forEach(k => row2.appendChild(createKey(k)));
+    keyboardContainer.appendChild(row2);
+
+    // Fileira 3: A S D F G H J K L + Enter (↵)
+    const row3 = document.createElement('div');
+    row3.style.cssText = 'display: flex; height: 20%; gap: 2px; padding: 0 2%;';
+    ['A','S','D','F','G','H','J','K','L'].forEach(k => row3.appendChild(createKey(k)));
+    row3.appendChild(createKey('↵', '1.5'));
+    keyboardContainer.appendChild(row3);
+
+    // Fileira 4: Z X C V B N M
+    const row4 = document.createElement('div');
+    row4.style.cssText = 'display: flex; height: 20%; gap: 2px; padding: 0 8%;';
+    ['Z','X','C','V','B','N','M'].forEach(k => row4.appendChild(createKey(k)));
+    keyboardContainer.appendChild(row4);
+
+    // Fileira 5: Tecla SPACE e Botão ENTRAR
+    const row5 = document.createElement('div');
+    row5.style.cssText = 'display: flex; height: 20%; gap: 4px; padding: 0 15%;';
+    row5.appendChild(createKey('SPACE', '2'));
+    row5.appendChild(createKey('↵', '2'));
+    keyboardContainer.appendChild(row5);
+
+    benchView.appendChild(keyboardContainer);
+
+    // --- Botão de Fechar Overlay (X) ---
+    const closeBtn = document.createElement('button');
+    closeBtn.innerText = '✕ SAIR DA BANCADA';
+    closeBtn.style.cssText = `
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: rgba(180, 0, 0, 0.8);
+        color: #ffffff;
+        border: 1px solid #ff4444;
+        padding: 6px 12px;
+        font-family: monospace;
+        font-size: 11px;
+        font-weight: bold;
+        cursor: pointer;
+        border-radius: 4px;
+        z-index: 10;
+    `;
+    closeBtn.onclick = () => {
+        sounds.playClick();
+        this.closeConsoleOverlay();
+    };
+    benchView.appendChild(closeBtn);
+
+    aspectWrapper.appendChild(benchView);
+    overlay.appendChild(aspectWrapper);
+    document.body.appendChild(overlay);
 }
 
+/**
+ * Fecha o Overlay da Bancada de Comandos.
+ */
+
 public closeConsoleOverlay() {
-    if (this.consoleOverlayEl) {
-        this.consoleOverlayEl.remove();
-        this.consoleOverlayEl = null;
+    const modal = document.getElementById('console-modal');
+    if (modal) {
+        modal.remove();
     }
 }
     public startNoralmaTalking(durationMs: number = 4000) {
@@ -1167,7 +1725,7 @@ public checkLandingTrigger() {
             overlay.style.background = 'rgba(0, 255, 170, 0.08)';
         }
 
-        this.setText("🛬 [POUSO CONCLUÍDO]: A nave Exo-Voyager realizou o touchdown com sucesso no solo do planeta! Os motores desligaram e a eclusa principal está liberada.");
+        this.setText(" [POUSO CONCLUÍDO]: A nave Exo-Voyager realizou o touchdown com sucesso no solo do planeta! Os motores desligaram e a eclusa principal está liberada.");
     }, 220000);
 
         this.landingTimers.push(t1, t2, t3, t4);
@@ -1223,6 +1781,7 @@ public checkLandingTrigger() {
             this.handElement.src = handImgUrl;
         }
     }
+    
 
     // --- CORREÇÃO DO SISTEMA DE INVENTÁRIO NA UI ---
 
@@ -1458,7 +2017,33 @@ public renderInventory() {
         this.optionsContainer.innerHTML = '';
         this.updateUIState();
     }
+    public interactArmarioDormitorio() {
+    if (!this.getFlag('pensamento_codigo_visto')) {
+        this.setText("Um armário pessoal trancado.");
+        return;
+    }
 
+    if (this.hasItem('pe_de_cabra')) {
+        if (!this.hasItem('papel_codigo')) {
+            try { sounds.playClick(); } catch (e) {}
+
+            this.addItem({
+                id: 'papel_codigo',
+                name: 'Papel com Código',
+                iconSymbol: '📄',
+                description: 'Papel amassado com o código 482761.'
+            });
+
+            this.setText("Você usou o pé de cabra para arrombar o armário e encontrou um papel amassado!");
+            this.showItemInspector(papelCodigoImgUrl, "Código anotado: 482761");
+        } else {
+            this.setText("O armário já está aberto e vazio.");
+        }
+    } else {
+        try { sounds.playClick(); } catch (e) {}
+        this.showThought("Acho que perdi a chave... aquele pé de cabra, ainda tá no setor medico?");
+    }
+}
     public changeRoom(roomId: string) {
         sounds.playClick();
         this.stopLucianoTalking();
@@ -1466,6 +2051,18 @@ public renderInventory() {
         this.currentPanX = 0;
         this.panoramaTrack.style.transform = `translateX(0px)`;
         this.render();
+        if (roomId === 'bridge') {
+        const temCartao = this.hasItem('cartao_acesso_lvl2'); // Ajuste com o ID real do seu cartão
+        const temArma = this.hasItem
+        ('arma_laser_exogenesis');                 // Ajuste com o ID real da sua arma
+            
+        const jaPensou = this.getFlag('pensamento_codigo_visto');
+
+        if (temCartao && temArma && !jaPensou) {
+            this.setFlag('pensamento_codigo_visto', true);
+            this.showThought("Escrevi esse código de acesso em um papel. Acho que deixei no armário dentro do meu dormitório junto com as outras tralhas. Sabia que esqueceria!");
+        }
+    }
     }
 
     public setText(text: string) {
@@ -1496,7 +2093,7 @@ public renderInventory() {
         this.lucianoTalkTimeout = window.setTimeout(() => {
             this.stopLucianoTalking();
         }, durationMs);
-    }
+    }   
 
     public stopLucianoTalking() {
         if (this.lucianoTalkInterval !== null) {
@@ -1531,42 +2128,46 @@ public renderInventory() {
     this.panoramaTrack.style.backgroundImage = room.bgImage;
     this.clearOptions();
     this.hotspotLayer.innerHTML = '';
-     if (this.currentRoomId === 'bridge' && this.getFlag('landing_started')) {
-    // Hotspot para a bancada de controles
-    const consoleSpot = document.createElement('div');
-    consoleSpot.className = 'hotspot console-trigger';
-    consoleSpot.style.top = '65%';
-    consoleSpot.style.left = '25%';
-    consoleSpot.style.width = '50%';
-    consoleSpot.style.height = '30%';
 
-    consoleSpot.addEventListener('mouseenter', () => {
-        sounds.playHover();
-        this.tooltip.innerText = '🖥️ ASSUMIR CONTROLE DA BANCADA DE COMANDOS';
-        this.tooltip.style.display = 'block';
-        this.handElement.classList.add('hand-reach');
-    });
+    // Hotspot exclusivo da bancada durante o procedimento de pouso
+    if (this.currentRoomId === 'bridge' && this.getFlag('landing_started')) {
+        const consoleSpot = document.createElement('div');
+        consoleSpot.className = 'hotspot console-trigger';
+        consoleSpot.style.top = '65%';
+        consoleSpot.style.left = '25%';
+        consoleSpot.style.width = '50%';
+        consoleSpot.style.height = '30%';
 
-    consoleSpot.addEventListener('mouseleave', () => {
-        this.tooltip.style.display = 'none';
-        this.handElement.classList.remove('hand-reach');
-    });
+        consoleSpot.addEventListener('mouseenter', () => {
+            sounds.playHover();
+            this.tooltip.innerText = '🖥️ ASSUMIR CONTROLE DA BANCADA DE COMANDOS';
+            this.tooltip.style.display = 'block';
+            this.handElement.classList.add('hand-reach');
+        });
 
-    consoleSpot.addEventListener('click', (e: MouseEvent) => {
-        e.stopPropagation();
-        if (this.dragDistance > 6) return;
-        sounds.playClick();
-        this.openConsoleOverlay();
-    });
+        consoleSpot.addEventListener('mouseleave', () => {
+            this.tooltip.style.display = 'none';
+            this.handElement.classList.remove('hand-reach');
+        });
 
-    this.hotspotLayer.appendChild(consoleSpot);
-}   
+        consoleSpot.addEventListener('click', (e: MouseEvent) => {
+            e.stopPropagation();
+            if (this.dragDistance > 6) return;
+            sounds.playClick();
+            this.openConsoleOverlay();
+        });
+
+        this.hotspotLayer.appendChild(consoleSpot);
+    }   
+
     // Copia a lista base de NPCs da sala
     const activeNpcs = room.npcs ? [...room.npcs] : [];
 
-    // Adiciona Noralma Costa dinamicamente na Ponte de Comando se a turbulência começouconsole.log('--- DEBUG RENDER ---');
-        console.log('Sala Atual:', this.currentRoomId);
-        console.log('Turbulência Ativa?:', this.getFlag('landing_started'));
+    // Adiciona Noralma Costa dinamicamente se a turbulência começou
+    console.log('--- DEBUG RENDER ---');
+    console.log('Sala Atual:', this.currentRoomId);
+    console.log('Turbulência Ativa?:', this.getFlag('landing_started'));
+
     if (this.currentRoomId === 'bridge' && this.getFlag('landing_started')) {
         activeNpcs.push({
             id: 'noralma_costa',
@@ -1580,7 +2181,7 @@ public renderInventory() {
         });
     }
 
-    // Renderiza a lista combinada de NPCs
+    // Renderiza NPCs ativos
     activeNpcs.forEach(npc => {
         const npcEl = document.createElement('img');
         npcEl.src = npc.image;
@@ -1616,8 +2217,13 @@ public renderInventory() {
         this.hotspotLayer.appendChild(npcEl);
     });
 
-    // Renderização dos Hotspots
+    // Renderização dos Hotspots com filtro de visibilidade
     room.hotspots.forEach(spot => {
+        // Esconde o armário se a flag de pensamento ainda não tiver sido ativada
+        if (spot.id === 'armario_dormitorio' && !this.getFlag('pensamento_codigo_visto')) {
+            return;
+        }
+
         const el = document.createElement('div');
         el.className = 'hotspot';
         el.style.top = spot.top;
