@@ -1,0 +1,76 @@
+:root {
+  --emotion-level: 0%;
+  --glow-color: rgba(180, 0, 30, 0.4);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: #050505;
+  color: #d0d0d0;
+  font-family: 'Courier New', Courier, monospace;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+#game-container {
+  position: relative;
+  width: 800px;
+  height: 800px;
+  border: 2px solid #333;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.9);
+}
+
+/* Filtro corrigido com porcentagens válidas para o CSS */
+/* O filtro começa num tom sombrio e jogável (55% de brilho) e clareia até 105% */
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  
+  filter: grayscale(calc(100% - var(--emotion-level))) 
+          brightness(calc(55% + var(--emotion-level) * 0.5)) 
+          saturate(calc(10% + var(--emotion-level) * 0.9));
+  
+  transition: filter 1s ease-in-out;
+}
+
+#ui-layer {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.heart-status {
+  background: rgba(0, 0, 0, 0.7);
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #444;
+  font-size: 14px;
+}
+
+.heart-bar {
+  width: 150px;
+  height: 10px;
+  background: #222;
+  border: 1px solid #555;
+  margin-top: 5px;
+  overflow: hidden;
+}
+
+.heart-fill {
+  width: var(--emotion-level);
+  height: 100%;
+  background: #b30000;
+  box-shadow: 0 0 8px var(--glow-color);
+  transition: width 0.5s ease-in-out;
+}
