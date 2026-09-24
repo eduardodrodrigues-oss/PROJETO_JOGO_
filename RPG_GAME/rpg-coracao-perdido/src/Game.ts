@@ -14,7 +14,9 @@ export class Game {
   private gameState: "INTRO" | "INTRO_DIALOGUE" | "PLAYING" | "STORY_DIALOGUE" = "INTRO";
   private canStartFromIntro: boolean = false;
 
+  // Controle da Narrativa
   private hasCollectedFirstHeart: boolean = false;
+  private hasSeenMap3Dialogue: boolean = false;
   private storyQueue: string[] = [];
   private storyIndex: number = 0;
 
@@ -25,9 +27,6 @@ export class Game {
   private keyCooldown: boolean = false;
 
   private debugMode: boolean = false;
-
-  
-  
 
   constructor(containerId: string) {
     const container = document.getElementById(containerId);
@@ -217,8 +216,8 @@ export class Game {
     const triggers = this.world.getTriggersForMap(this.currentMapKey);
     let foundNear: InteractiveTrigger | null = null;
 
-    const playerCenterX = this.player.x + this.player.width / 2;
-    const playerCenterY = this.player.y + this.player.height / 2;
+    const playerCenterX = this.player.x + (this.player.width || 32) / 2;
+    const playerCenterY = this.player.y + (this.player.height || 32) / 2;
 
     for (const trigger of triggers) {
       const dist = Math.hypot(playerCenterX - trigger.x, playerCenterY - trigger.y);
@@ -244,29 +243,50 @@ export class Game {
       return;
     }
 
-    if (this.player.y < -10) {
+    const playerHeight = this.player.height || 32;
+
+    // Transição para CIMA (dispara assim que encosta no topo y <= 0)
+    if (this.player.y <= 0) {
       if (this.currentMapKey === "0,0") {
         this.currentMapKey = "0,1";
-        this.player.y = this.canvas.height - this.player.height - 10;
+        this.player.y = this.canvas.height - playerHeight - 15;
       } else if (this.currentMapKey === "0,1") {
         this.currentMapKey = "0,2";
-        this.player.y = this.canvas.height - this.player.height - 10;
+        this.player.y = this.canvas.height - playerHeight - 15;
+
+        if (!this.hasSeenMap3Dialogue) {
+          this.triggerMap3Dialogue();
+        }
+      } else if (this.currentMapKey === "0,2") {
+        this.currentMapKey = "0,3";
+        this.player.y = this.canvas.height - playerHeight - 15;
       } else {
-        this.player.y = -10;
+        this.player.y = 0;
       }
     }
 
-    if (this.player.y > this.canvas.height - this.player.height + 10) {
-      if (this.currentMapKey === "0,2") {
+    // Transição para BAIXO (dispara na borda inferior)
+    if (this.player.y >= this.canvas.height - playerHeight) {
+      if (this.currentMapKey === "0,3") {
+        this.currentMapKey = "0,2";
+        this.player.y = 15;
+      } else if (this.currentMapKey === "0,2") {
         this.currentMapKey = "0,1";
-        this.player.y = 10;
+        this.player.y = 15;
       } else if (this.currentMapKey === "0,1") {
         this.currentMapKey = "0,0";
-        this.player.y = 10;
+        this.player.y = 15;
       } else {
-        this.player.y = this.canvas.height - this.player.height + 10;
+        this.player.y = this.canvas.height - playerHeight;
       }
     }
+  }
+
+  private triggerMap3Dialogue(): void {
+    this.hasSeenMap3Dialogue = true;
+    this.storyQueue = ["Pessoas. Continuar"];
+    this.storyIndex = 0;
+    this.gameState = "STORY_DIALOGUE";
   }
 
   public start(): void {
@@ -287,7 +307,6 @@ export class Game {
       return;
     }
 
-    // Passa o parâmetro 'time' para movimentar a vegetação do cenário
     this.world.render(
       this.ctx,
       this.canvas.width,
@@ -458,8 +477,8 @@ export class Game {
 
     if (maxAlpha <= 0.01) return;
 
-    const playerCenterX = this.player.x + this.player.width / 2;
-    const playerCenterY = this.player.y + this.player.height / 2;
+    const playerCenterX = this.player.x + (this.player.width || 32) / 2;
+    const playerCenterY = this.player.y + (this.player.height || 32) / 2;
 
     const innerRadius = 60 + (this.emotionLevel / 100) * 120;
     const outerRadius = 220 + (this.emotionLevel / 100) * 400;
