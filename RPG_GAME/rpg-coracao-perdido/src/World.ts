@@ -18,7 +18,6 @@ export interface InteractiveTrigger {
 export class World {
   private mapImages: Map<string, HTMLImageElement> = new Map();
   public triggers: InteractiveTrigger[] = [];
-  public isLoaded: boolean = false;
 
   constructor() {
     const mapsToLoad = [
@@ -29,22 +28,9 @@ export class World {
       { id: "house_interior", src: "/assets/house_interior.png" }
     ];
 
-    let loadedCount = 0;
-    const checkAllLoaded = () => {
-      loadedCount++;
-      if (loadedCount === mapsToLoad.length) {
-        this.isLoaded = true;
-      }
-    };
-
     mapsToLoad.forEach((mapInfo) => {
       const img = new Image();
       img.src = mapInfo.src;
-      img.onload = checkAllLoaded;
-      img.onerror = () => {
-        console.warn(`Erro ao carregar a imagem do mapa: ${mapInfo.src}`);
-        checkAllLoaded();
-      };
       this.mapImages.set(mapInfo.id, img);
     });
 
@@ -52,7 +38,17 @@ export class World {
   }
 
   private initTriggers(): void {
-    // 1. Coração na pedra (map2)
+    // --- ESPADA NO MAPA INICIAL (0,0) ---
+    this.triggers.push({
+      id: "espada_item",
+      mapKey: "0,0",
+      x: 450,
+      y: 350,
+      title: "Espada Antiga",
+      type: "item",
+      collected: false
+    });
+
     this.triggers.push({
       id: "heart_map2",
       mapKey: "0,1",
@@ -63,7 +59,6 @@ export class World {
       collected: false
     });
 
-    // 2. Trigger na porta de entrada da Casa (map3 / "0,2")
     this.triggers.push({
       id: "house_door_enter",
       mapKey: "0,2",
@@ -73,7 +68,6 @@ export class World {
       type: "door_enter"
     });
 
-    // 3. Pedaço de Coração na Cama (house_interior)
     this.triggers.push({
       id: "heart_house_bed",
       mapKey: "house_interior",
@@ -96,39 +90,37 @@ export class World {
         // --- POÇO ---
         { x: 650, y: 285, width: 58, height: 90 },
 
-        // --- OBSTÁCULOS SECUNDÁRIOS (Ajustados para liberar passagem nas laterais) ---
-        { x: 140, y: 520, width: 70, height: 50 },  // Arbusto/pedra inferior esquerda
-        { x: 180, y: 405, width: 70, height: 25 },  // Cerca/rocha esquerda
-        { x: 600, y: 580, width: 180, height: 170 }, // Floresta densa inferior direita
+        // --- OBSTÁCULOS SECUNDÁRIOS (Afastados do corredor do map4) ---
+        { x: 140, y: 520, width: 70, height: 50 },
+        { x: 180, y: 405, width: 70, height: 25 },
 
-        // Floresta (Paredes Laterais)
-        { x: 0, y: 0, width: 130, height: 800 }     // Parede da esquerda mais recuada
+        // Paredes laterais de árvores (recortadas no final para não trancar a saída inferior)
+        { x: 0, y: 0, width: 100, height: 600 },
+        { x: 700, y: 0, width: 100, height: 600 }
       ];
     }
 
     if (mapKey === "0,3") {
       return [
-        // Paredes de árvores densas laterais
-        { x: 0, y: 0, width: 140, height: 800 },    // Floresta Esquerda
-        { x: 660, y: 0, width: 140, height: 800 },  // Floresta Direita
+        // Paredes laterais recuadas no topo para garantir entrada sem colisões
+        { x: 0, y: 100, width: 100, height: 700 },
+        { x: 700, y: 100, width: 100, height: 700 },
 
-        // Pedras e troncos do map4
-        { x: 175, y: 145, width: 75, height: 70 },  // Pedra Superior Esquerda
-        { x: 525, y: 220, width: 70, height: 65 },  // Pedra Direita Superior
-        { x: 545, y: 110, width: 100, height: 55 }, // Tronco Caído Superior Direito
-        { x: 230, y: 470, width: 70, height: 60 },  // Pedra Inferior Esquerda
-        { x: 570, y: 670, width: 65, height: 55 }   // Pedra Inferior Direita
+        // Pedras e troncos apenas do meio para o fim do mapa
+        { x: 525, y: 300, width: 70, height: 65 },
+        { x: 230, y: 470, width: 70, height: 60 },
+        { x: 570, y: 670, width: 65, height: 55 }
       ];
     }
 
     if (mapKey === "house_interior") {
       return [
-        { x: 0, y: 0, width: 800, height: 115 },       // Parede Superior
-        { x: 0, y: 0, width: 90, height: 800 },        // Parede Esquerda
-        { x: 710, y: 0, width: 90, height: 800 },      // Parede Direita
-        { x: 0, y: 710, width: 330, height: 90 },      // Parede Inferior Esquerda
-        { x: 470, y: 710, width: 330, height: 90 },    // Parede Inferior Direita
-        { x: 310, y: 270, width: 180, height: 200 }    // Mesa central
+        { x: 0, y: 0, width: 800, height: 115 },
+        { x: 0, y: 0, width: 90, height: 800 },
+        { x: 710, y: 0, width: 90, height: 800 },
+        { x: 0, y: 710, width: 330, height: 90 },
+        { x: 470, y: 710, width: 330, height: 90 },
+        { x: 310, y: 270, width: 180, height: 200 }
       ];
     }
 
@@ -148,10 +140,10 @@ export class World {
   ): void {
     const currentMap = this.mapImages.get(mapKey);
 
-    if (currentMap) {
+    if (currentMap && currentMap.complete && currentMap.naturalWidth > 0) {
       ctx.drawImage(currentMap, 0, 0, width, height);
     } else {
-      ctx.fillStyle = "#050505";
+      ctx.fillStyle = "#121d15";
       ctx.fillRect(0, 0, width, height);
     }
 
@@ -184,8 +176,8 @@ export class World {
     const particleCount = 18;
     for (let i = 0; i < particleCount; i++) {
       const speed = 0.03 + (i % 5) * 0.01;
-      const pX = (time * speed + i * 137) % (width + 100) - 50;
-      const pY = ((i * 83) + Math.sin(time * 0.002 + i) * 30) % height;
+      const pX = ((time * speed + i * 137) % (width + 100)) - 50;
+      const pY = (i * 83 + Math.sin(time * 0.002 + i) * 30) % height;
       const size = 1.5 + (i % 3);
 
       ctx.fillStyle = i % 2 === 0 ? "rgba(255, 255, 200, 0.25)" : "rgba(10, 25, 18, 0.4)";
@@ -217,23 +209,44 @@ export class World {
         const floatOffsetY = Math.sin(animTime) * 4;
         const y = trigger.y + floatOffsetY;
 
-        ctx.shadowColor = "#ff2a55";
-        ctx.shadowBlur = 12 + Math.sin(animTime) * 6;
+        if (trigger.id === "espada_item") {
+          // --- VISUAL DE ESPADA NO MAPA ---
+          ctx.shadowColor = "#ffd700";
+          ctx.shadowBlur = 10 + Math.sin(animTime) * 5;
 
-        const size = 12;
-        ctx.fillStyle = "#ff1a4a";
-        ctx.beginPath();
-        ctx.arc(x - size / 2, y - size / 2, size / 2, Math.PI, 0, false);
-        ctx.arc(x + size / 2, y - size / 2, size / 4, Math.PI, 0, false);
-        ctx.lineTo(x, y + size);
-        ctx.closePath();
-        ctx.fill();
+          ctx.strokeStyle = "#e0e0e0";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(x, y + 10);
+          ctx.lineTo(x, y - 10);
+          ctx.stroke();
 
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = "#ffffff";
-        ctx.beginPath();
-        ctx.arc(x - size / 3, y - size / 2, size / 4, 0, Math.PI * 2);
-        ctx.fill();
+          ctx.strokeStyle = "#d4af37";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(x - 6, y + 3);
+          ctx.lineTo(x + 6, y + 3);
+          ctx.stroke();
+        } else {
+          // --- VISUAL DE CORAÇÃO ---
+          ctx.shadowColor = "#ff2a55";
+          ctx.shadowBlur = 12 + Math.sin(animTime) * 6;
+
+          const size = 12;
+          ctx.fillStyle = "#ff1a4a";
+          ctx.beginPath();
+          ctx.arc(x - size / 2, y - size / 2, size / 2, Math.PI, 0, false);
+          ctx.arc(x + size / 2, y - size / 2, size / 2, Math.PI, 0, false);
+          ctx.lineTo(x, y + size);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath();
+          ctx.arc(x - size / 3, y - size / 2, size / 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
 
         ctx.restore();
       }
