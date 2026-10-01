@@ -1,0 +1,79 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+body {
+  background-color: #0d0d0d;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-family: monospace;
+  overflow: hidden;
+}
+
+.game-container {
+  position: relative;
+  display: inline-block;
+}
+
+.hud {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  z-index: 10;
+}
+
+.health-container {
+  position: relative;
+  width: 100%;
+  height: 30px;
+  background-color: rgba(255, 0, 0, 0.4);
+  border: 4px solid #fff;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+}
+
+.health-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  transition: width 0.1s ease-out;
+}
+
+.health-bar.player1 {
+  right: 0;
+  background-color: #00ffcc;
+}
+
+.health-bar.player2 {
+  left: 0;
+  background-color: #ff0055;
+}
+
+.timer {
+  background-color: #111;
+  color: #fff;
+  width: 60px;
+  height: 50px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 24px;
+  font-weight: bold;
+  border: 3px solid #fff;
+  flex-shrink: 0;
+}
+
+canvas {
+  border: 4px solid #222;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.9);
+  display: block;
+}

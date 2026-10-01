@@ -1344,7 +1344,7 @@ public interactPeDeCabra() {
             sounds.playClick();
             // Se a alavanca NÃO foi puxada, exibe o pensamento
             if (!this.getFlag('alavanca_puxada')) {
-                this.showThought("Lembro que sempre puxei primeiro a alavanca...");
+                this.setText("Lembro que sempre puxei primeiro a alavanca...");
                 return;
             }
             // Se energizado, envia a digitação da tecla

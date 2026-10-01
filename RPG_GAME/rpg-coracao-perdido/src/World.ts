@@ -25,7 +25,9 @@ export class World {
       { id: "0,1", src: "/assets/map2.png" },
       { id: "0,2", src: "/assets/map3.png" },
       { id: "0,3", src: "/assets/map4.png" },
-      { id: "house_interior", src: "/assets/house_interior.png" }
+      { id: "house_interior", src: "/assets/house_interior.png" },
+      // Novo mapa do Prólogo (Aldeia Corrompida Sob o Castelo)
+      { id: "prologue_1", src: "/assets/Aldeia Corrompida Sob o Castelo.png" }
     ];
 
     mapsToLoad.forEach((mapInfo) => {
@@ -35,6 +37,14 @@ export class World {
     });
 
     this.initTriggers();
+  }
+
+  public getPrologueMapImage(): HTMLImageElement {
+    return this.mapImages.get("prologue_1")!;
+  }
+
+  public getMapImage(id: string): HTMLImageElement | undefined {
+    return this.mapImages.get(id);
   }
 
   private initTriggers(): void {
@@ -90,11 +100,11 @@ export class World {
         // --- POÇO ---
         { x: 650, y: 285, width: 58, height: 90 },
 
-        // --- OBSTÁCULOS SECUNDÁRIOS (Afastados do corredor do map4) ---
+        // --- OBSTÁCULOS SECUNDÁRIOS ---
         { x: 140, y: 520, width: 70, height: 50 },
         { x: 180, y: 405, width: 70, height: 25 },
 
-        // Paredes laterais de árvores (recortadas no final para não trancar a saída inferior)
+        // Paredes laterais de árvores
         { x: 0, y: 0, width: 100, height: 600 },
         { x: 700, y: 0, width: 100, height: 600 }
       ];
@@ -102,11 +112,11 @@ export class World {
 
     if (mapKey === "0,3") {
       return [
-        // Paredes laterais recuadas no topo para garantir entrada sem colisões
+        // Paredes laterais recuadas no topo
         { x: 0, y: 100, width: 100, height: 700 },
         { x: 700, y: 100, width: 100, height: 700 },
 
-        // Pedras e troncos apenas do meio para o fim do mapa
+        // Pedras e troncos do meio para o fim do mapa
         { x: 525, y: 300, width: 70, height: 65 },
         { x: 230, y: 470, width: 70, height: 60 },
         { x: 570, y: 670, width: 65, height: 55 }
@@ -121,6 +131,35 @@ export class World {
         { x: 0, y: 710, width: 330, height: 90 },
         { x: 470, y: 710, width: 330, height: 90 },
         { x: 310, y: 270, width: 180, height: 200 }
+      ];
+    }
+
+    // --- PRIMEIRO MAPA DO PRÓLOGO (Aldeia Corrompida Sob o Castelo) ---
+    if (mapKey === "prologue_1") {
+      return [
+        // Muralha e Portão do Castelo à direita
+        { x: 680, y: 0, width: 120, height: 800 },
+
+        // Ruínas / Casa superior esquerda
+        { x: 60, y: 100, width: 180, height: 130 },
+
+        // Ruínas / Casa superior centro
+        { x: 380, y: 20, width: 140, height: 130 },
+
+        // Poço / Cercas do lado esquerdo
+        { x: 0, y: 340, width: 110, height: 120 },
+
+        // Casa do meio esquerda
+        { x: 130, y: 440, width: 150, height: 130 },
+
+        // Casa inferior esquerda
+        { x: 50, y: 640, width: 170, height: 140 },
+
+        // Casa inferior centro
+        { x: 420, y: 650, width: 160, height: 130 },
+
+        // Restos de fogueira / corrupção no centro
+        { x: 430, y: 430, width: 80, height: 60 }
       ];
     }
 

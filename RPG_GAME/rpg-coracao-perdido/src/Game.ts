@@ -2,6 +2,7 @@ import { Player } from "./Player";
 import { World, type InteractiveTrigger } from "./World";
 import { SoundManager } from "./SoundManager";
 import { Monster } from "./Monster";
+import { Prologue } from "./Prologue";
 
 export interface InventoryItem {
   id: string;
@@ -34,7 +35,8 @@ export class Game {
 
   private gameState: "INTRO" | "INTRO_DIALOGUE" | "PLAYING" | "DYING" | "STORY_DIALOGUE" | "GAME_OVER" | "GAME_END" = "INTRO";
   private canStartFromIntro: boolean = false;
-
+  private prologue: Prologue | null = null;
+  private isPrologueActive: boolean = false;
   private hasCollectedFirstHeart: boolean = false;
   private hasSeenMap3Dialogue: boolean = false;
   private hasSeenMap4Dialogue: boolean = false;
@@ -42,7 +44,8 @@ export class Game {
   private isVictorySequence: boolean = false;
   private storyQueue: string[] = [];
   private storyIndex: number = 0;
-
+  private prologue: Prologue | null = null;
+  private isPrologueActive: boolean = false;
   private currentMapKey: string = "0,0";
   private activeTriggerNear: InteractiveTrigger | null = null;
   private isDialogueOpen: boolean = false;
@@ -544,47 +547,54 @@ export class Game {
   }
 
   public start(): void {
-    const loop = () => {
-      const now = Date.now();
-      const deltaTime = now - this.lastTime;
-      this.lastTime = now;
+  const loop = () => {
+    const now = Date.now();
+    const deltaTime = now - this.lastTime;
+    this.lastTime = now;
 
-      if (this.invincibilityTimer > 0) {
-        this.invincibilityTimer -= deltaTime;
-      }
+    if (this.invincibilityTimer > 0) {
+      this.invincibilityTimer -= deltaTime;
+    }
 
-      this.player.update(deltaTime);
+    // Se estiver no Prólogo, atualiza o Prólogo
+    if (this.isPrologueActive && this.prologue) {
+      this.prologue.update(deltaTime);
+      this.prologue.render();
+      requestAnimationFrame(loop);
+      return;
+    }
 
-      if (this.gameState === "DYING" && this.player.getIsDead()) {
-        this.gameState = "GAME_OVER";
-      }
+    this.player.update(deltaTime);
 
-      this.handleInput();
+    if (this.gameState === "DYING" && this.player.getIsDead()) {
+      this.gameState = "GAME_OVER";
+    }
 
-      if (this.currentMapKey === "0,3" && this.gameState === "PLAYING") {
-        this.monsterMap4.update(this.player.x, this.player.y, deltaTime);
+    this.handleInput();
 
-        if (this.isMonsterDead()) {
-          this.triggerVictory();
-        } else {
-          const dmg = this.monsterMap4.checkAttackImpact(
-            this.player.x,
-            this.player.y,
-            this.player.width,
-            this.player.height
-          );
-          if (dmg > 0) {
-            this.applyDamage(dmg);
-          }
+    if (this.currentMapKey === "0,3" && this.gameState === "PLAYING") {
+      this.monsterMap4.update(this.player.x, this.player.y, deltaTime);
+
+      if (this.isMonsterDead()) {
+        this.triggerVictory();
+      } else {
+        const dmg = this.monsterMap4.checkAttackImpact(
+          this.player.x,
+          this.player.y,
+          this.player.width,
+          this.player.height
+        );
+        if (dmg > 0) {
+          this.applyDamage(dmg);
         }
       }
+    }
 
-      this.render();
-      requestAnimationFrame(loop);
-    };
+    this.render();
     requestAnimationFrame(loop);
-  }
-
+  };
+  requestAnimationFrame(loop);
+}
   private render(): void {
     const time = Date.now();
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -652,13 +662,34 @@ export class Game {
     }
   }
 
-  private renderEndScreen(): void {
-    this.ctx.save();
-    this.ctx.fillStyle = "#000000";
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    this.ctx.restore();
-  }
+  // No Game.ts
 
+private renderEndScreen(): void {
+  this.ctx.save();
+  this.ctx.fillStyle = "#000000";
+  this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+  this.ctx.restore();
+
+  // Inicia a sequência de prólogo
+  if (!this.isPrologueActive) {
+    this.isPrologueActive = true;
+    
+    // Pega a imagem do novo mapa carregada no World
+    const prologueMapImg = this.world.getPrologueMapImage();
+
+    this.prologue = new Prologue(this.canvas, this.ctx, prologueMapImg, () => {
+      // CALLBACK: Executado assim que "Prólogo: Coração" desaparece!
+      this.isPrologueActive = false;
+      this.prologue = null;
+
+      // Troca o mapa para o novo mapa e posiciona o jogador
+      this.currentMapKey = "prologue_1";
+      this.player.x = 380; // Centro do mapa/aldeia
+      this.player.y = 520;
+      this.gameState = "PLAYING"; // Libera a movimentação do jogador!
+    });
+  }
+}
   private renderHUD(): void {
     this.ctx.save();
 

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jogo de Luta 2D</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div class="game-container">
+    <!-- Interface (HUD): Barras de Vida e Tempo -->
+    <div class="hud">
+      <div class="health-container">
+        <div id="player1Health" class="health-bar player1"></div>
+      </div>
+      <div id="timer" class="timer">60</div>
+      <div class="health-container">
+        <div id="player2Health" class="health-bar player2"></div>
+      </div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
