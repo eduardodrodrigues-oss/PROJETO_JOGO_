@@ -1,33 +1,5 @@
 import { Sprite } from './Sprite';
 import { Fighter } from './Fighter';
-import backgroundSrc from './assets/background.png';
-import player1Src from './assets/player1.png';
-import player2Src from './assets/player2.png';
-
-// Ao criar as instâncias, passe os imports:
-const background = new Sprite({
-  position: { x: 0, y: 0 },
-  imageSrc: backgroundSrc
-});
-
-const player = new Fighter({
-  position: { x: 100, y: 0 },
-  velocity: { x: 0, y: 0 },
-  imageSrc: player1Src,
-  framesMax: 4,
-  scale: 2,
-  attackOffset: { x: 50, y: 30 }
-});
-
-const enemy = new Fighter({
-  position: { x: 800, y: 0 },
-  velocity: { x: 0, y: 0 },
-  color: 'blue',
-  imageSrc: player2Src,
-  framesMax: 4,
-  scale: 2,
-  attackOffset: { x: -90, y: 30 }
-});
 
 const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
@@ -37,40 +9,50 @@ canvas.height = 576;
 
 const GRAVITY = 0.7;
 
-// Instância do Cenário
 const background = new Sprite({
   position: { x: 0, y: 0 },
-  imageSrc: '/background.png'
+  imageSrc: '/assets/background.png'
 });
 
-// Instâncias dos Jogadores
-const player = new Fighter({
-  position: { x: 100, y: 0 },
+// Player 1 (BOT)[cite: 14, 15, 17]
+const bot = new Fighter({
+  position: { x: 100, y: 100 },
   velocity: { x: 0, y: 0 },
-  imageSrc: '/player1.png',
-  framesMax: 4, // Altere conforme a quantidade de frames na sua sprite sheet
-  scale: 2,
-  attackOffset: { x: 50, y: 30 }
+  imageSrc: '/assets/player1_parado.png',
+  framesMax: 1,
+  scale: 0.8,
+  attackOffset: { x: 50, y: 30 },
+  sprites: {
+    idle: { imageSrc: '/assets/player1_parado.png', framesMax: 1 },
+    attack: { imageSrc: '/assets/player1_ataque.png', framesMax: 1 },
+    takeHit: { imageSrc: '/assets/player1_tomou_dano.png', framesMax: 1 }
+  }
 });
 
-const enemy = new Fighter({
-  position: { x: 800, y: 0 },
+// Player 2 (JOGADOR)[cite: 8, 9, 11, 12, 13, 16]
+const player = new Fighter({
+  position: { x: 800, y: 100 },
   velocity: { x: 0, y: 0 },
   color: 'blue',
-  imageSrc: '/player2.png',
-  framesMax: 4,
-  scale: 2,
-  attackOffset: { x: -90, y: 30 }
+  imageSrc: '/assets/player2_parado.png',
+  framesMax: 1,
+  scale: 0.8,
+  attackOffset: { x: -100, y: 30 },
+  sprites: {
+    idle: { imageSrc: '/assets/player2_parado.png', framesMax: 1 },
+    attack: { imageSrc: '/assets/player2_ataque.png', framesMax: 2 },
+    shieldAttack: { imageSrc: '/assets/player2_ataque_escudo.png', framesMax: 1 },
+    special: { imageSrc: '/assets/player2_especial.jpg', framesMax: 2 },
+    defense: { imageSrc: '/assets/player2_defesa.png', framesMax: 1 },
+    takeHit: { imageSrc: '/assets/player2_tomou_dano.png', framesMax: 1 }
+  }
 });
 
 const keys = {
-  a: { pressed: false },
-  d: { pressed: false },
-  ArrowLeft: { pressed: false },
-  ArrowRight: { pressed: false }
+  left: { pressed: false },
+  right: { pressed: false }
 };
 
-// Detecção de Colisão Retangular (AABB)
 function checkCollision(rect1: Fighter, rect2: Fighter): boolean {
   return (
     rect1.attackBox.position.x + rect1.attackBox.width >= rect2.position.x &&
@@ -80,114 +62,139 @@ function checkCollision(rect1: Fighter, rect2: Fighter): boolean {
   );
 }
 
-// Timer do Jogo
+// Relógio do Jogo
 let timer = 60;
-const timerElement = document.getElementById('timer')!;
-const timerInterval = setInterval(() => {
-  if (timer > 0) {
-    timer--;
-    timerElement.innerText = timer.toString();
-  } else {
-    clearInterval(timerInterval);
-  }
-}, 1000);
+const timerElement = document.getElementById('timer');
+if (timerElement) {
+  const timerInterval = setInterval(() => {
+    if (timer > 0) {
+      timer--;
+      timerElement.innerText = timer.toString();
+    } else {
+      clearInterval(timerInterval);
+    }
+  }, 1000);
+}
 
-// Loop Principal do Jogo
 function animate() {
   requestAnimationFrame(animate);
 
   ctx.fillStyle = 'black';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Renderizar Cenário
-  background.draw(ctx);
+  background.drawBackground(ctx, canvas.width, canvas.height);
 
-  // Atualizar Jogadores
-  player.update(ctx, GRAVITY, canvas.height);
-  enemy.update(ctx, GRAVITY, canvas.height);
+  // Executa Inteligência do Bot
+  bot.updateBot(player);
 
-  // Resetar Velocidade Horizontal
+  // Movimento do Player 2
   player.velocity.x = 0;
-  enemy.velocity.x = 0;
+  if (keys.left.pressed) player.velocity.x = -5;
+  else if (keys.right.pressed) player.velocity.x = 5;
 
-  // Controles Player 1
-  if (keys.a.pressed) player.velocity.x = -5;
-  else if (keys.d.pressed) player.velocity.x = 5;
+  // Animação do Bot
+  if (bot.isAttacking) bot.switchSprite('attack');
+  else if (bot.isTakingHit) bot.switchSprite('takeHit');
+  else bot.switchSprite('idle');
 
-  // Controles Player 2
-  if (keys.ArrowLeft.pressed) enemy.velocity.x = -5;
-  else if (keys.ArrowRight.pressed) enemy.velocity.x = 5;
-
-  // Checar Golpe do Player 1 no Player 2
-  if (player.isAttacking && checkCollision(player, enemy)) {
-    player.isAttacking = false;
-    enemy.health = Math.max(0, enemy.health - 10);
-    const enemyBar = document.getElementById('player2Health');
-    if (enemyBar) enemyBar.style.width = `${enemy.health}%`;
+  // Animação do Player 2
+  if (player.isAttacking) {
+    // Mantém o sprite atual do ataque
+  } else if (player.isDefending) {
+    player.switchSprite('defense');
+  } else if (player.isTakingHit) {
+    player.switchSprite('takeHit');
+  } else {
+    player.switchSprite('idle');
   }
 
-  // Checar Golpe do Player 2 no Player 1
-  if (enemy.isAttacking && checkCollision(enemy, player)) {
-    enemy.isAttacking = false;
-    player.health = Math.max(0, player.health - 10);
-    const playerBar = document.getElementById('player1Health');
+  bot.update(ctx, GRAVITY, canvas.height);
+  player.update(ctx, GRAVITY, canvas.height);
+
+  // Colisão: Bot atacando o Player
+  if (bot.isAttacking && checkCollision(bot, player)) {
+    bot.isAttacking = false;
+    player.takeHit(10);
+    const playerBar = document.getElementById('player2Health');
     if (playerBar) playerBar.style.width = `${player.health}%`;
+  }
+
+  // Colisão: Player atacando o Bot
+  if (player.isAttacking && checkCollision(player, bot)) {
+    player.isAttacking = false;
+    bot.takeHit(15);
+    const botBar = document.getElementById('player1Health');
+    if (botBar) botBar.style.width = `${bot.health}%`;
   }
 }
 
 animate();
 
-// Eventos de Teclado
-window.addEventListener('keydown', (event) => {
-  switch (event.key) {
-    // Controles Player 1
-    case 'd':
-    case 'D':
-      keys.d.pressed = true;
-      break;
-    case 'a':
-    case 'A':
-      keys.a.pressed = true;
-      break;
-    case 'w':
-    case 'W':
-      if (player.isGrounded) player.velocity.y = -18;
-      break;
-    case ' ':
-      player.attack();
-      break;
-
-    // Controles Player 2
-    case 'ArrowRight':
-      keys.ArrowRight.pressed = true;
-      break;
+// --- CONTROLES DE TECLADO ---
+window.addEventListener('keydown', (e) => {
+  switch (e.key) {
     case 'ArrowLeft':
-      keys.ArrowLeft.pressed = true;
+      keys.left.pressed = true;
+      break;
+    case 'ArrowRight':
+      keys.right.pressed = true;
       break;
     case 'ArrowUp':
-      if (enemy.isGrounded) enemy.velocity.y = -18;
+      if (player.isGrounded) player.velocity.y = -18;
       break;
-    case 'Enter':
-      enemy.attack();
+    case 'z':
+    case 'Z':
+      player.executeAttack('attack', 300);
+      break;
+    case 'x':
+    case 'X':
+      player.executeAttack('shieldAttack', 400);
+      break;
+    case 'c':
+    case 'C':
+      player.executeAttack('special', 600);
+      break;
+    case 'v':
+    case 'V':
+      player.isDefending = true;
       break;
   }
 });
 
-window.addEventListener('keyup', (event) => {
-  switch (event.key) {
-    case 'd':
-    case 'D':
-      keys.d.pressed = false;
-      break;
-    case 'a':
-    case 'A':
-      keys.a.pressed = false;
+window.addEventListener('keyup', (e) => {
+  switch (e.key) {
+    case 'ArrowLeft':
+      keys.left.pressed = false;
       break;
     case 'ArrowRight':
-      keys.ArrowRight.pressed = false;
+      keys.right.pressed = false;
       break;
-    case 'ArrowLeft':
-      keys.ArrowLeft.pressed = false;
+    case 'v':
+    case 'V':
+      player.isDefending = false;
       break;
   }
 });
+
+// --- CONTROLES DOS BOTÕES NA TELA ---
+const bindButton = (id: string, onPress: () => void, onRelease?: () => void) => {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+
+  btn.addEventListener('mousedown', onPress);
+  btn.addEventListener('touchstart', (e) => { e.preventDefault(); onPress(); });
+
+  if (onRelease) {
+    btn.addEventListener('mouseup', onRelease);
+    btn.addEventListener('mouseleave', onRelease);
+    btn.addEventListener('touchend', onRelease);
+  }
+};
+
+bindButton('btnLeft', () => { keys.left.pressed = true; }, () => { keys.left.pressed = false; });
+bindButton('btnRight', () => { keys.right.pressed = true; }, () => { keys.right.pressed = false; });
+bindButton('btnJump', () => { if (player.isGrounded) player.velocity.y = -18; });
+bindButton('btnAttack', () => player.executeAttack('attack', 300));
+bindButton('btnShield', () => player.executeAttack('shieldAttack', 400));
+bindButton('btnSpecial', () => player.executeAttack('special', 600));
+bindButton('btnDefend', () => { player.isDefending = true; }, () => { player.isDefending = false; });

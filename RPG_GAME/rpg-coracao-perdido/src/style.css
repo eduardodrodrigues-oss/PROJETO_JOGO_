@@ -22,8 +22,8 @@ body {
 
 #game-container {
   position: relative;
-  width: 800px;
-  height: 800px;
+  width: 500px;
+  height: 500px;
   border: 2px solid #333;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.9);
 }

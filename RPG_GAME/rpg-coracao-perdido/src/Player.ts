@@ -5,20 +5,25 @@ export class Player {
   public y: number;
   public width: number = 48;
   public height: number = 64;
-  public speed: number = 3.5;
+  public speed: number = 3.5; // Velocidade base por frame (escala via deltaTime)
 
-  private idleImg: HTMLImageElement;
-  private walkImg: HTMLImageElement;
-  private hurtImg: HTMLImageElement;
-  private die1Img: HTMLImageElement;
-  private die2Img: HTMLImageElement;
-  private attackImg: HTMLImageElement;
-  private isLoaded: boolean = false;
+  private idleImg!: HTMLImageElement;
+  private walkImg!: HTMLImageElement;
+  private hurtImg!: HTMLImageElement;
+  private die1Img!: HTMLImageElement;
+  private die2Img!: HTMLImageElement;
+  private attackImg!: HTMLImageElement;
+  public isLoaded: boolean = false;
 
   // Direção no Spritesheet:
   // 0 = Frente (Baixo) | 1 = Direita | 2 = Costas (Cima) | 3 = Esquerda
   private direction: number = 0;
   private isMoving: boolean = false;
+
+  // Controle de Animação de Caminhada
+  private walkFrame: number = 0;
+  private walkTimer: number = 0;
+  private walkFrameSpeed: number = 120; // Duração de cada frame em ms
 
   // Controle de Espada e Ataque
   public hasSword: boolean = false;
@@ -43,38 +48,37 @@ export class Player {
     this.x = x;
     this.y = y;
 
-    this.idleImg = new Image();
-    this.idleImg.src = "/assets/player_idle.png";
-
-    this.walkImg = new Image();
-    this.walkImg.src = "/assets/player_walk.png";
-
-    this.hurtImg = new Image();
-    this.hurtImg.src = "/assets/tomando_dano.png";
-
-    this.die1Img = new Image();
-    this.die1Img.src = "/assets/morrendo1.png";
-
-    this.die2Img = new Image();
-    this.die2Img.src = "/assets/morrendo_morrendo2.png";
-
-    this.attackImg = new Image();
-    this.attackImg.src = "/assets/ataque_player.png";
-
     let loadedCount = 0;
+    const totalAssets = 6;
+
     const checkLoaded = () => {
       loadedCount++;
-      if (loadedCount === 6) {
+      if (loadedCount === totalAssets) {
         this.isLoaded = true;
       }
     };
 
-    this.idleImg.onload = checkLoaded;
-    this.walkImg.onload = checkLoaded;
-    this.hurtImg.onload = checkLoaded;
-    this.die1Img.onload = checkLoaded;
-    this.die2Img.onload = checkLoaded;
-    this.attackImg.onload = checkLoaded;
+    // Atribuição com método seguro para prever cache/erros de rede
+    this.idleImg = this.loadImage("/assets/player_idle.png", checkLoaded);
+    this.walkImg = this.loadImage("/assets/player_walk.png", checkLoaded);
+    this.hurtImg = this.loadImage("/assets/tomando_dano.png", checkLoaded);
+    this.die1Img = this.loadImage("/assets/morrendo1.png", checkLoaded);
+    this.die2Img = this.loadImage("/assets/morrendo_morrendo2.png", checkLoaded);
+    this.attackImg = this.loadImage("/assets/ataque_player.png", checkLoaded);
+  }
+
+  /**
+   * Garante o encadeamento correto de listeners de imagem antes de atribuir o .src
+   */
+  private loadImage(src: string, onLoadCallback: () => void): HTMLImageElement {
+    const img = new Image();
+    img.onload = onLoadCallback;
+    img.onerror = () => {
+      console.error(`[Player] Erro ao carregar o asset: ${src}`);
+      onLoadCallback(); // Evita travar a inicialização se um arquivo falhar
+    };
+    img.src = src;
+    return img;
   }
 
   // Realiza o ataque se possuir a espada
@@ -99,10 +103,13 @@ export class Player {
     this.isDead = false;
     this.isHurt = false;
     this.isAttacking = false;
+    this.isMoving = false;
     this.deathFrame = 0;
     this.deathTimer = 0;
     this.hurtFrame = 0;
     this.hurtTimer = 0;
+    this.walkFrame = 0;
+    this.walkTimer = 0;
   }
 
   public getIsDying(): boolean {
@@ -121,7 +128,7 @@ export class Player {
   }
 
   public update(deltaTime: number): void {
-    // Atualização da animação de Morte
+    // 1. Atualização de Morte
     if (this.isDying) {
       this.deathTimer += deltaTime;
       if (this.deathTimer >= this.deathFrameSpeed) {
@@ -137,7 +144,7 @@ export class Player {
       return;
     }
 
-    // Atualização do Ataque
+    // 2. Atualização do Ataque
     if (this.isAttacking) {
       this.attackTimer += deltaTime;
       if (this.attackTimer >= this.attackDuration) {
@@ -147,7 +154,7 @@ export class Player {
       return;
     }
 
-    // Atualização de Dano
+    // 3. Atualização de Dano
     if (this.isHurt) {
       this.hurtTimer += deltaTime;
       if (this.hurtTimer >= this.hurtFrameSpeed) {
@@ -159,10 +166,23 @@ export class Player {
           this.hurtFrame = 0;
         }
       }
+      return;
+    }
+
+    // 4. Animação de Caminhada
+    if (this.isMoving) {
+      this.walkTimer += deltaTime;
+      if (this.walkTimer >= this.walkFrameSpeed) {
+        this.walkTimer = 0;
+        this.walkFrame = (this.walkFrame + 1) % 4;
+      }
+    } else {
+      this.walkFrame = 0;
+      this.walkTimer = 0;
     }
   }
 
-  public move(dx: number, dy: number, obstacles: Rect[]): void {
+  public move(dx: number, dy: number, obstacles: Rect[], deltaTime: number = 16.67): void {
     if (this.isHurt || this.isDying || this.isDead || this.isAttacking) {
       this.isMoving = false;
       return;
@@ -183,12 +203,16 @@ export class Player {
         moveY *= 0.7071;
       }
 
-      const nextX = this.x + moveX * this.speed;
+      // Normalização pelo deltaTime (evita variação de velocidade em telas com taxas de atualização diferentes)
+      const deltaFactor = deltaTime / 16.67;
+      const step = this.speed * deltaFactor;
+
+      const nextX = this.x + moveX * step;
       if (!this.checkCollision(nextX, this.y, obstacles)) {
         this.x = nextX;
       }
 
-      const nextY = this.y + moveY * this.speed;
+      const nextY = this.y + moveY * step;
       if (!this.checkCollision(this.x, nextY, obstacles)) {
         this.y = nextY;
       }
@@ -204,19 +228,39 @@ export class Player {
     };
   }
 
-  // Hitbox de alcance do Ataque
+  // Hitbox de alcance do Ataque centralizada em relação ao corpo do jogador
   public getAttackHitbox(): Rect {
     const attackWidth = 60;
     const attackHeight = 60;
 
     if (this.direction === 1) { // Direita
-      return { x: this.x + this.width, y: this.y, width: attackWidth, height: attackHeight };
+      return {
+        x: this.x + this.width,
+        y: this.y + (this.height - attackHeight) / 2,
+        width: attackWidth,
+        height: attackHeight
+      };
     } else if (this.direction === 3) { // Esquerda
-      return { x: this.x - attackWidth, y: this.y, width: attackWidth, height: attackHeight };
+      return {
+        x: this.x - attackWidth,
+        y: this.y + (this.height - attackHeight) / 2,
+        width: attackWidth,
+        height: attackHeight
+      };
     } else if (this.direction === 2) { // Cima
-      return { x: this.x, y: this.y - attackHeight, width: attackWidth, height: attackHeight };
+      return {
+        x: this.x + (this.width - attackWidth) / 2,
+        y: this.y - attackHeight,
+        width: attackWidth,
+        height: attackHeight
+      };
     } else { // Baixo
-      return { x: this.x, y: this.y + this.height, width: attackWidth, height: attackHeight };
+      return {
+        x: this.x + (this.width - attackWidth) / 2,
+        y: this.y + this.height,
+        width: attackWidth,
+        height: attackHeight
+      };
     }
   }
 
@@ -263,14 +307,7 @@ export class Player {
       const frameHeight = currentImg.height;
       const sx = localFrameIndex * frameWidth;
 
-      if (this.direction === 3) {
-        ctx.translate(this.x + this.width, this.y);
-        ctx.scale(-1, 1);
-        ctx.drawImage(currentImg, sx, 0, frameWidth, frameHeight, 0, 0, this.width, this.height);
-      } else {
-        ctx.drawImage(currentImg, sx, 0, frameWidth, frameHeight, this.x, this.y, this.width, this.height);
-      }
-
+      this.drawSprite(ctx, currentImg, sx, 0, frameWidth, frameHeight, this.direction === 3, this.x, this.y, this.width, this.height);
       ctx.restore();
       return;
     }
@@ -281,13 +318,19 @@ export class Player {
       const offsetX = (attackSize - this.width) / 2;
       const offsetY = (attackSize - this.height) / 2;
 
-      if (this.direction === 3) {
-        ctx.translate(this.x + this.width + offsetX, this.y - offsetY);
-        ctx.scale(-1, 1);
-        ctx.drawImage(this.attackImg, 0, 0, attackSize, attackSize);
-      } else {
-        ctx.drawImage(this.attackImg, this.x - offsetX, this.y - offsetY, attackSize, attackSize);
-      }
+      this.drawSprite(
+        ctx,
+        this.attackImg,
+        0,
+        0,
+        this.attackImg.width,
+        this.attackImg.height,
+        this.direction === 3,
+        this.x - offsetX,
+        this.y - offsetY,
+        attackSize,
+        attackSize
+      );
 
       ctx.restore();
       return;
@@ -299,14 +342,7 @@ export class Player {
       const frameHeight = this.hurtImg.height;
       const sx = this.hurtFrame * frameWidth;
 
-      if (this.direction === 3) {
-        ctx.translate(this.x + this.width, this.y);
-        ctx.scale(-1, 1);
-        ctx.drawImage(this.hurtImg, sx, 0, frameWidth, frameHeight, 0, 0, this.width, this.height);
-      } else {
-        ctx.drawImage(this.hurtImg, sx, 0, frameWidth, frameHeight, this.x, this.y, this.width, this.height);
-      }
-
+      this.drawSprite(ctx, this.hurtImg, sx, 0, frameWidth, frameHeight, this.direction === 3, this.x, this.y, this.width, this.height);
       ctx.restore();
       return;
     }
@@ -315,12 +351,38 @@ export class Player {
     const currentImg = this.isMoving ? this.walkImg : this.idleImg;
     const frameWidth = currentImg.width / 4;
     const frameHeight = currentImg.height;
-
     const sx = this.direction * frameWidth;
 
-    ctx.drawImage(currentImg, sx, 0, frameWidth, frameHeight, this.x, this.y, this.width, this.height);
+    this.drawSprite(ctx, currentImg, sx, 0, frameWidth, frameHeight, false, this.x, this.y, this.width, this.height);
 
     ctx.restore();
+  }
+
+  /**
+   * Utilitário de renderização centralizado com suporte a espelhamento horizontal (Flip)
+   */
+  private drawSprite(
+    ctx: CanvasRenderingContext2D,
+    img: HTMLImageElement,
+    sx: number,
+    sy: number,
+    sWidth: number,
+    sHeight: number,
+    flipHorizontal: boolean,
+    dx: number,
+    dy: number,
+    dWidth: number,
+    dHeight: number
+  ): void {
+    if (flipHorizontal) {
+      ctx.save();
+      ctx.translate(dx + dWidth, dy);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, dWidth, dHeight);
+      ctx.restore();
+    } else {
+      ctx.drawImage(img, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
+    }
   }
 
   public renderDebug(ctx: CanvasRenderingContext2D): void {
@@ -333,4 +395,12 @@ export class Player {
     ctx.strokeRect(hb.x, hb.y, hb.width, hb.height);
     ctx.restore();
   }
+  public getBounds(): Rect {
+  return {
+    x: this.x,
+    y: this.y,
+    width: this.width,
+    height: this.height
+  };
+}
 }

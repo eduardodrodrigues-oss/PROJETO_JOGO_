@@ -696,28 +696,44 @@ private handleKeypadInput(key: string, displayEl: HTMLElement) {
 }
 
 /**
+/**
  * Validação da senha de 6 dígitos no Console (Código correto: 482761).
  */
 private validateConsoleCode(displayEl: HTMLElement) {
     const TARGET_CODE = '482761';
 
     if (this.consoleCodeInput === TARGET_CODE) {
+        // 1. Marca as flags de sucesso do pouso
         this.setFlag('pouso_autorizado', true);
+        this.setFlag('sistema_desbloqueado', true);
+        this.setFlag('ship_landed', true);
+
+        // 2. Interrompe o tremor e cancela os cronômetros de colisão/morte
+        this.applyShakeLevel(0);
+        this.landingTimers.forEach(t => clearTimeout(t));
+        this.landingTimers = [];
+
+        // 3. Remove qualquer overlay de alerta vermelho piscante
+        const alertOverlay = document.getElementById('landing-alert-overlay');
+        if (alertOverlay) alertOverlay.remove();
+
+        // 4. Feedback no visor da bancada
         displayEl.style.color = '#00ff66';
         displayEl.innerText = 'ACEITO';
-        sounds.playClick();
+        try { sounds.playClick(); } catch (e) {}
 
-        this.setText("CÓDIGO ACEITO! Protocolo de Pouso Desbloqueado. Iniciando Reentrada Atmosférica...");
-        this.triggerLandingSequence();
-
+        // 5. Fecha o overlay do console e inicia a cutscene do Capítulo 1
         setTimeout(() => {
             this.closeConsoleOverlay();
-        }, 1500);
+            this.showLandingSuccessCutscene();
+        }, 1200);
+
     } else {
+        // Código Incorreto
         displayEl.style.color = '#ff3333';
         displayEl.innerText = 'ERRO';
-        sounds.playClick();
-        this.setText("CÓDIGO INCORRETO! Acesso negado pela matriz de controle.");
+        try { sounds.playClick(); } catch (e) {}
+        this.setText("⚠️ CÓDIGO INCORRETO! Acesso negado pela matriz de controle.");
 
         setTimeout(() => {
             this.consoleCodeInput = '';
@@ -725,6 +741,118 @@ private validateConsoleCode(displayEl: HTMLElement) {
             displayEl.innerText = '------';
         }, 1200);
     }
+}
+private showLandingSuccessCutscene() {
+    // Cria o overlay em tela preta
+    const cutsceneOverlay = document.createElement('div');
+    cutsceneOverlay.id = 'landing-cutscene-overlay';
+    cutsceneOverlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #000000;
+        z-index: 99999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+        box-sizing: border-box;
+        color: #ffffff;
+        font-family: monospace;
+        text-align: center;
+        opacity: 0;
+        transition: opacity 1.5s ease;
+    `;
+
+    // Caixa de texto estilizada da narrativa
+    const textContainer = document.createElement('div');
+    textContainer.style.cssText = `
+        max-width: 800px;
+        background: rgba(5, 15, 10, 0.9);
+        border: 1px solid #00ffaa;
+        border-radius: 8px;
+        padding: 30px;
+        box-shadow: 0 0 25px rgba(0, 255, 170, 0.25);
+        font-size: 18px;
+        line-height: 1.7;
+        color: #e0e0e0;
+        transition: opacity 1s ease;
+    `;
+    textContainer.innerText = "A nave atravessou a atmosfera, rasgando-a. Logo faíscas começaram a queimar o casco da Exo-voyager e os fortes tremores danificaram as asas da nave, por sorte Field tomou controle da bancada e conseguiu pousar com sucesso, salvando sua tripulação.";
+
+    // Indicador sutil para o jogador
+    const continuePrompt = document.createElement('div');
+    continuePrompt.style.cssText = `
+        margin-top: 25px;
+        font-size: 12px;
+        color: #00ffaa;
+        opacity: 0.6;
+        letter-spacing: 2px;
+    `;
+    continuePrompt.innerText = "[ CLIQUE PARA AVANÇAR OU AGUARDE ]";
+    textContainer.appendChild(continuePrompt);
+
+    cutsceneOverlay.appendChild(textContainer);
+    document.body.appendChild(cutsceneOverlay);
+
+    // Surgimento suave (Fade In)
+    requestAnimationFrame(() => {
+        cutsceneOverlay.style.opacity = '1';
+    });
+
+    let isTransitioned = false;
+
+    // Transição para o título do Capítulo 1
+    const advanceToChapterTitle = () => {
+        if (isTransitioned) return;
+        isTransitioned = true;
+
+        // Esconde o texto da narrativa
+        textContainer.style.opacity = '0';
+
+        setTimeout(() => {
+            textContainer.style.display = 'none';
+
+            // Título do Capítulo 1
+            const chapterTitle = document.createElement('h1');
+            chapterTitle.style.cssText = `
+                font-size: 42px;
+                color: #00ffaa;
+                letter-spacing: 4px;
+                text-transform: uppercase;
+                text-shadow: 0 0 20px rgba(0, 255, 170, 0.8);
+                margin: 0;
+                opacity: 0;
+                transition: opacity 1.5s ease;
+            `;
+            chapterTitle.innerText = "Capítulo 1: O planeta";
+            cutsceneOverlay.appendChild(chapterTitle);
+
+            requestAnimationFrame(() => {
+                chapterTitle.style.opacity = '1';
+            });
+
+            // Após 4 segundos no título, remove a tela preta e atualiza o jogo
+            setTimeout(() => {
+                cutsceneOverlay.style.opacity = '0';
+                setTimeout(() => {
+                    cutsceneOverlay.remove();
+                    this.render(); // Redesenha a tela do jogo no novo cenário pousado
+                }, 1500);
+            }, 4000);
+
+        }, 1000);
+    };
+
+    // Avança automaticamente em 8 segundos ou no clique do jogador
+    const autoTimer = setTimeout(advanceToChapterTitle, 8000);
+    cutsceneOverlay.onclick = () => {
+        clearTimeout(autoTimer);
+        advanceToChapterTitle();
+    };
 }
     public showItemInspector(imageUrl: string, description?: string) {
     const existing = document.getElementById('item-inspector');
@@ -1607,129 +1735,161 @@ public checkLandingTrigger() {
         container.classList.add(`shake-lvl-${level}`);
         }
     }
+private triggerGameOver(reasonText: string) {
+    // Parar tremores e fechar overlay do console se estiver aberto
+    this.applyShakeLevel(0);
+    this.closeConsoleOverlay();
 
+    // Remove alertas
+    const alertOverlay = document.getElementById('landing-alert-overlay');
+    if (alertOverlay) alertOverlay.remove();
+
+    // Cria tela preta de Game Over sobreposta
+    const gameOverScreen = document.createElement('div');
+    gameOverScreen.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        background: #000000;
+        z-index: 99999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #ff3333;
+        font-family: monospace;
+        text-align: center;
+        padding: 20px;
+    `;
+
+    gameOverScreen.innerHTML = `
+        <h1 style="font-size: 48px; margin-bottom: 20px; text-shadow: 0 0 10px #ff0000;">GAME OVER</h1>
+        <p style="font-size: 18px; color: #cccccc; max-width: 600px; margin-bottom: 30px; line-height: 1.5;">${reasonText}</p>
+        <p style="font-size: 14px; color: #888888;">Reiniciando o sistema em 5 segundos...</p>
+    `;
+
+    document.body.appendChild(gameOverScreen);
+
+    // Reinicia a página do jogo após 5 segundos
+    setTimeout(() => {
+        window.location.reload();
+    }, 5000);
+}
     // Inicia o cronômetro do pouso com tremor progressivo de 3m 40s
-    private triggerLandingSequence() {
-        this.setFlag('landing_started', true);
+    // Inicia o cronômetro do pouso com tremor progressivo de 3m 40s
+private triggerLandingSequence() {
+    this.setFlag('landing_started', true);
 
-    // 2. FORÇA o jogo a desenhar a sala novamente com a Noralma
-        this.render()
-    // Dispara a re-renderização caso o jogador já esteja na Ponte de Comando
     if (this.currentRoomId === 'bridge') {
         this.render();
     }
-        sounds.playClick();
+    try { sounds.playClick(); } catch (e) {}
 
-        this.setText("🚨 [ALERTA DO SISTEMA DE BORDO]: Entrando na atmosfera! Retrofoguetes acionados. Sequência de pouso automático iniciada (Tempo estimado: 3m 40s).");
+    this.setText("🚨 [ALERTA CRÍTICO DE BORDO]: Reentrada atmosférica descontrolada! Insira o código de autorização de pouso na bancada antes do impacto! (Tempo restante: 3m 40s)");
 
-        const container = document.getElementById('game-container') || this.viewport;
+    const container = document.getElementById('game-container') || this.viewport;
 
-        // Injeta os estilos CSS de tremor e alerta piscante na página
-        if (!document.getElementById('landing-shake-styles')) {
-            const style = document.createElement('style');
-            style.id = 'landing-shake-styles';
-            style.innerHTML = `
-                @keyframes pulseAlert {
-                    0% { opacity: 0.1; }
-                    100% { opacity: 0.5; }
-                }
-                @keyframes shakeLvl1 {
-                    0%, 100% { transform: translate(0, 0); }
-                    25% { transform: translate(-2px, 1px); }
-                    50% { transform: translate(2px, -1px); }
-                    75% { transform: translate(-1px, -2px); }
-                }
-                @keyframes shakeLvl2 {
-                    0%, 100% { transform: translate(0, 0); }
-                    20% { transform: translate(-4px, 3px); }
-                    40% { transform: translate(4px, -3px); }
-                    60% { transform: translate(-3px, -4px); }
-                    80% { transform: translate(3px, 4px); }
-                }
-                @keyframes shakeLvl3 {
-                    0%, 100% { transform: translate(0, 0); }
-                    15% { transform: translate(-7px, 5px) rotate(-0.5deg); }
-                    30% { transform: translate(7px, -5px) rotate(0.5deg); }
-                    45% { transform: translate(-6px, -6px) rotate(-0.5deg); }
-                    60% { transform: translate(6px, 6px) rotate(0.5deg); }
-                    75% { transform: translate(-5px, 4px); }
-                }
-                @keyframes shakeLvl4 {
-                    0%, 100% { transform: translate(0, 0); }
-                    10% { transform: translate(-12px, 9px) rotate(-1.5deg); }
-                    20% { transform: translate(12px, -9px) rotate(1.5deg); }
-                    30% { transform: translate(-10px, -10px) rotate(-1deg); }
-                    40% { transform: translate(10px, 10px) rotate(1deg); }
-                    50% { transform: translate(-14px, 7px) rotate(-2deg); }
-                    60% { transform: translate(14px, -7px) rotate(2deg); }
-                    70% { transform: translate(-9px, 11px) rotate(-1deg); }
-                    80% { transform: translate(9px, -11px) rotate(1deg); }
-                }
+    // Injeta os estilos CSS de tremor
+    if (!document.getElementById('landing-shake-styles')) {
+        const style = document.createElement('style');
+        style.id = 'landing-shake-styles';
+        style.innerHTML = `
+            @keyframes pulseAlert {
+                0% { opacity: 0.1; }
+                100% { opacity: 0.6; }
+            }
+            @keyframes shakeLvl1 {
+                0%, 100% { transform: translate(0, 0); }
+                25% { transform: translate(-2px, 1px); }
+                50% { transform: translate(2px, -1px); }
+                75% { transform: translate(-1px, -2px); }
+            }
+            @keyframes shakeLvl2 {
+                0%, 100% { transform: translate(0, 0); }
+                20% { transform: translate(-4px, 3px); }
+                40% { transform: translate(4px, -3px); }
+                60% { transform: translate(-3px, -4px); }
+                80% { transform: translate(3px, 4px); }
+            }
+            @keyframes shakeLvl3 {
+                0%, 100% { transform: translate(0, 0); }
+                15% { transform: translate(-7px, 5px) rotate(-0.5deg); }
+                30% { transform: translate(7px, -5px) rotate(0.5deg); }
+                45% { transform: translate(-6px, -6px) rotate(-0.5deg); }
+                60% { transform: translate(6px, 6px) rotate(0.5deg); }
+                75% { transform: translate(-5px, 4px); }
+            }
+            @keyframes shakeLvl4 {
+                0%, 100% { transform: translate(0, 0); }
+                10% { transform: translate(-12px, 9px) rotate(-1.5deg); }
+                20% { transform: translate(12px, -9px) rotate(1.5deg); }
+                30% { transform: translate(-10px, -10px) rotate(-1deg); }
+                40% { transform: translate(10px, 10px) rotate(1deg); }
+                50% { transform: translate(-14px, 7px) rotate(-2deg); }
+                60% { transform: translate(14px, -7px) rotate(2deg); }
+                70% { transform: translate(-9px, 11px) rotate(-1deg); }
+                80% { transform: translate(9px, -11px) rotate(1deg); }
+            }
 
-                .shake-lvl-1 { animation: shakeLvl1 0.4s infinite; }
-                .shake-lvl-2 { animation: shakeLvl2 0.3s infinite; }
-                .shake-lvl-3 { animation: shakeLvl3 0.2s infinite; }
-                .shake-lvl-4 { animation: shakeLvl4 0.1s infinite; }
-        `   ;
-            document.head.appendChild(style);
-        }
+            .shake-lvl-1 { animation: shakeLvl1 0.4s infinite; }
+            .shake-lvl-2 { animation: shakeLvl2 0.3s infinite; }
+            .shake-lvl-3 { animation: shakeLvl3 0.2s infinite; }
+            .shake-lvl-4 { animation: shakeLvl4 0.1s infinite; }
+        `;
+        document.head.appendChild(style);
+    }
 
     // Cria a luz de alerta vermelho piscante na tela
-        if (container && !document.getElementById('landing-alert-overlay')) {
-            const overlay = document.createElement('div');
-            overlay.id = 'landing-alert-overlay';
-            overlay.style.cssText = `
-                position: absolute;
-                top: 0; left: 0; width: 100%; height: 100%;
-                background: rgba(255, 0, 0, 0.25);
-                pointer-events: none;
-                z-index: 999;
-                animation: pulseAlert 1.2s infinite alternate;
-        `   ;
-            container.appendChild(overlay);
-        }
+    if (container && !document.getElementById('landing-alert-overlay')) {
+        const overlay = document.createElement('div');
+        overlay.id = 'landing-alert-overlay';
+        overlay.style.cssText = `
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 0, 0, 0.3);
+            pointer-events: none;
+            z-index: 999;
+            animation: pulseAlert 1s infinite alternate;
+        `;
+        container.appendChild(overlay);
+    }
 
-    // Cancela timers anteriores se houver
-        this.landingTimers.forEach(t => clearTimeout(t));
-        this.landingTimers = [];
+    // Cancela timers anteriores
+    this.landingTimers.forEach(t => clearTimeout(t));
+    this.landingTimers = [];
 
-    // T = 0s: Inicia com tremor leve
-        this.applyShakeLevel(1);
+    // T = 0s: Tremor Leve
+    this.applyShakeLevel(1);
 
-    // T = 1 minuto (60.000 ms): Tremor Nível 2
+    // T = 1min (60s)
     const t1 = window.setTimeout(() => {
+        if (this.getFlag('pouso_autorizado')) return;
         this.applyShakeLevel(2);
-        this.setText("🚨 [SISTEMA DE BORDO]: Entrando na atmosfera superior. Turbulência moderada detectada.");
+        this.setText("🚨 [ALERTA DE BORDO]: Entrando na atmosfera superior. Turbulência aumentando!");
     }, 60000);
 
-    // T = 2 minutos (120.000 ms): Tremor Nível 3
+    // T = 2min (120s)
     const t2 = window.setTimeout(() => {
+        if (this.getFlag('pouso_autorizado')) return;
         this.applyShakeLevel(3);
-        this.setText("🚨 [SISTEMA DE BORDO]: Turbulência severa! Fogo de atrito atmosférico detectado (Nível 3).");
+        this.setText("🚨 [ALERTA DE BORDO]: Turbulência SEVERA! Atrito atmosférico no limite!");
     }, 120000);
 
-    // T = 3 minutos (180.000 ms): Tremor Nível 4 (Muito Forte)
+    // T = 3min (180s)
     const t3 = window.setTimeout(() => {
+        if (this.getFlag('pouso_autorizado')) return;
         this.applyShakeLevel(4);
-        this.setText("🚨 [SISTEMA DE BORDO]: ALERTA MÁXIMO! Desaceleração extrema dos retrofoguetes! Mantenha-se firme!");
+        this.setText("🚨 [ALERTA MÁXIMO]: FALTAM 40 SEGUNDOS PARA O IMPACTO! INSIRA O CÓDIGO!");
     }, 180000);
 
-    // T = 3 minutos e 40 segundos (220.000 ms): TOUCHDOWN - POUSO CONCLUÍDO!
+    // T = 3min e 40s (220s): IMPACTO / COLISÃO / GAME OVER
     const t4 = window.setTimeout(() => {
-        this.applyShakeLevel(0);
-        this.setFlag('ship_landed', true);
-
-        const overlay = document.getElementById('landing-alert-overlay');
-        if (overlay) {
-            overlay.style.animation = 'none';
-            overlay.style.background = 'rgba(0, 255, 170, 0.08)';
+        if (!this.getFlag('pouso_autorizado')) {
+            this.triggerGameOver("💥 A nave colidiu com o solo em alta velocidade por falta do código de autorização! Todos a bordo morreram no impacto.");
         }
-
-        this.setText(" [POUSO CONCLUÍDO]: A nave Exo-Voyager realizou o touchdown com sucesso no solo do planeta! Os motores desligaram e a eclusa principal está liberada.");
     }, 220000);
 
-        this.landingTimers.push(t1, t2, t3, t4);
-    }
+    this.landingTimers.push(t1, t2, t3, t4);
+}
     public inspectLaserWeapon() {
     this.stopLucianoTalking();
     this.clearOptions();

@@ -3,12 +3,14 @@ import { World, type InteractiveTrigger } from "./World";
 import { SoundManager } from "./SoundManager";
 import { Monster } from "./Monster";
 import { Prologue } from "./Prologue";
+import { HunterBoss } from "./HunterBoss";
 
 export interface InventoryItem {
   id: string;
   name: string;
   icon: HTMLImageElement;
   description: string;
+  count?: number;
 }
 
 export class Game {
@@ -18,22 +20,24 @@ export class Game {
   private world: World;
   private soundManager: SoundManager;
   private monsterMap4: Monster;
+  private hunterBoss: HunterBoss;
 
   private keys: { [key: string]: boolean } = {};
 
   // Imagens do Inventário
   private mochilaImg: HTMLImageElement;
   private espadaImg: HTMLImageElement;
+  private carneImg: HTMLImageElement;
   private inventory: InventoryItem[] = [];
   private isInventoryOpen: boolean = false;
 
-  // Status de Vida do Jogador
+  // Status do Jogador
   private playerHealth: number = 100;
   private maxHealth: number = 100;
   private emotionLevel: number = 0;
   private invincibilityTimer: number = 0;
 
-  private gameState: "INTRO" | "INTRO_DIALOGUE" | "PLAYING" | "DYING" | "STORY_DIALOGUE" | "GAME_OVER" | "GAME_END" = "INTRO";
+  private gameState: "INTRO" | "INTRO_DIALOGUE" | "PLAYING" | "DYING" | "STORY_DIALOGUE" | "HUNTER_DIALOGUE" | "GAME_OVER" | "GAME_END" = "INTRO";
   private canStartFromIntro: boolean = false;
   private prologue: Prologue | null = null;
   private isPrologueActive: boolean = false;
@@ -42,12 +46,20 @@ export class Game {
   private hasSeenMap4Dialogue: boolean = false;
   private hasSeenHouseDialogue: boolean = false;
   private isVictorySequence: boolean = false;
+
+  // Diálogos Gerais
   private storyQueue: string[] = [];
   private storyIndex: number = 0;
-  private prologue: Prologue | null = null;
-  private isPrologueActive: boolean = false;
+
+  // Diálogo do Caçador com Retrato
+  private hunterDialogueQueue: { speaker: "hunter" | "choice"; text?: string; question?: string; options?: string[] }[] = [];
+  private hunterDialogueIndex: number = 0;
+  private hunterChoiceIndex: number = 0;
+
   private currentMapKey: string = "0,0";
   private activeTriggerNear: InteractiveTrigger | null = null;
+  private isHunterNear: boolean = false;
+
   private isDialogueOpen: boolean = false;
   private dialogueOptionIndex: number = 0;
   private keyCooldown: boolean = false;
@@ -72,13 +84,17 @@ export class Game {
     this.soundManager = new SoundManager();
     this.player = new Player(388, 388);
     this.monsterMap4 = new Monster(370, 300);
+    this.hunterBoss = new HunterBoss(280, 250);
 
-    // Carregamento de Sprites de UI
+    // Sprites
     this.mochilaImg = new Image();
     this.mochilaImg.src = "/assets/mochila.png";
 
     this.espadaImg = new Image();
     this.espadaImg.src = "/assets/espada.png";
+
+    this.carneImg = new Image();
+    this.carneImg.src = "/assets/carne.png";
 
     this.initControls();
     this.initMouseControls();
@@ -89,23 +105,12 @@ export class Game {
     }, 1500);
   }
 
-  // Método auxiliar para verificar com precisão se o monstro morreu
   private isMonsterDead(): boolean {
     if (!this.monsterMap4) return false;
     const m = this.monsterMap4 as any;
-
-    if (typeof m.isDead === "function") {
-      return m.isDead();
-    }
-    if (typeof m.isDead === "boolean") {
-      return m.isDead;
-    }
-    if (typeof m.health === "number") {
-      return m.health <= 0;
-    }
-    if (typeof m.hp === "number") {
-      return m.hp <= 0;
-    }
+    if (typeof m.isDead === "function") return m.isDead();
+    if (typeof m.isDead === "boolean") return m.isDead;
+    if (typeof m.health === "number") return m.health <= 0;
     return false;
   }
 
@@ -115,7 +120,6 @@ export class Game {
       const clickX = e.clientX - rect.left;
       const clickY = e.clientY - rect.top;
 
-      // Posição do botão da Mochila
       if (clickX >= 725 && clickX <= 775 && clickY >= 15 && clickY <= 65) {
         if (this.gameState === "PLAYING") {
           this.isInventoryOpen = !this.isInventoryOpen;
@@ -123,7 +127,6 @@ export class Game {
         return;
       }
 
-      // Fechar inventário clicando fora
       if (this.isInventoryOpen) {
         const boxX = (this.canvas.width - 360) / 2;
         const boxY = (this.canvas.height - 300) / 2;
@@ -157,23 +160,19 @@ export class Game {
       }
 
       if (this.gameState === "INTRO_DIALOGUE") {
-        if (e.key === " " || e.key === "Enter" || e.toLowerCase() === "e") {
+        if (e.key === " " || e.key === "Enter" || e.key.toLowerCase() === "e") {
           this.gameState = "PLAYING";
         }
         return;
       }
 
       if (this.gameState === "STORY_DIALOGUE") {
-        if ((e.key === " " || e.key === "Enter" || e.toLowerCase() === "e") && !this.keyCooldown) {
+        if ((e.key === " " || e.key === "Enter" || e.key.toLowerCase() === "e") && !this.keyCooldown) {
           this.storyIndex++;
           this.keyCooldown = true;
 
           if (this.storyIndex >= this.storyQueue.length) {
-            if (this.isVictorySequence) {
-              this.gameState = "GAME_END"; // Tela preta final
-            } else {
-              this.gameState = "PLAYING";
-            }
+            this.gameState = this.isVictorySequence ? "GAME_END" : "PLAYING";
             this.storyQueue = [];
             this.storyIndex = 0;
           }
@@ -181,7 +180,11 @@ export class Game {
         return;
       }
 
-      // Tecla para abrir/fechar inventário
+      if (this.gameState === "HUNTER_DIALOGUE") {
+        this.handleHunterDialogueControls(e.key);
+        return;
+      }
+
       if (e.key.toLowerCase() === "i") {
         if (this.gameState === "PLAYING") {
           this.isInventoryOpen = !this.isInventoryOpen;
@@ -189,7 +192,6 @@ export class Game {
         return;
       }
 
-      // Tecla de Ataque (Espaço ou F)
       if ((e.key === " " || e.key.toLowerCase() === "f") && this.gameState === "PLAYING" && !this.isDialogueOpen && !this.isInventoryOpen) {
         if (this.player.hasSword) {
           this.player.attack();
@@ -212,11 +214,8 @@ export class Game {
     });
   }
 
-  // Processa o ataque do jogador atingindo o monstro
   private handlePlayerAttack(): void {
-    if (this.currentMapKey !== "0,3" || !this.monsterMap4) return;
-
-    const attackRange = 50;
+    const attackRange = 55;
     let attackX = this.player.x;
     let attackY = this.player.y;
     let attackW = this.player.width;
@@ -224,39 +223,140 @@ export class Game {
 
     const direction = (this.player as any).direction || "down";
     switch (direction) {
-      case "up":
-        attackY -= attackRange;
-        attackH += attackRange;
-        break;
-      case "down":
-        attackH += attackRange;
-        break;
-      case "left":
-        attackX -= attackRange;
-        attackW += attackRange;
-        break;
-      case "right":
-        attackW += attackRange;
-        break;
+      case "up": attackY -= attackRange; attackH += attackRange; break;
+      case "down": attackH += attackRange; break;
+      case "left": attackX -= attackRange; attackW += attackRange; break;
+      case "right": attackW += attackRange; break;
     }
 
-    if (typeof (this.monsterMap4 as any).takeDamage === "function") {
+    if (this.currentMapKey === "0,3" && this.monsterMap4) {
       const monsterX = (this.monsterMap4 as any).x ?? 370;
       const monsterY = (this.monsterMap4 as any).y ?? 300;
       const monsterW = (this.monsterMap4 as any).width ?? 48;
       const monsterH = (this.monsterMap4 as any).height ?? 48;
 
-      const isHit =
+      if (
         attackX < monsterX + monsterW &&
         attackX + attackW > monsterX &&
         attackY < monsterY + monsterH &&
-        attackY + attackH > monsterY;
-
-      if (isHit) {
+        attackY + attackH > monsterY
+      ) {
         (this.monsterMap4 as any).takeDamage(25);
         if (this.isMonsterDead()) {
           this.triggerVictory();
         }
+      }
+    }
+
+    if (this.currentMapKey === "prologue_2" && this.hunterBoss && this.hunterBoss.isHostile && !this.hunterBoss.isSurrendered) {
+      if (
+        attackX < this.hunterBoss.x + this.hunterBoss.width &&
+        attackX + attackW > this.hunterBoss.x &&
+        attackY < this.hunterBoss.y + this.hunterBoss.height &&
+        attackY + attackH > this.hunterBoss.y
+      ) {
+        this.hunterBoss.takeDamage(25);
+      }
+    }
+  }
+
+  private startHunterConversation(): void {
+    this.gameState = "HUNTER_DIALOGUE";
+    this.hunterDialogueIndex = 0;
+    this.hunterChoiceIndex = 0;
+
+    if (this.hunterBoss.questState === 0) {
+      this.hunterDialogueQueue = [
+        { speaker: "hunter", text: " Nunca vi você nessas terras... Sangue, há muito sangue por aqui." },
+        { speaker: "choice", question: "Como deseja responder?", options: ["Existe algo importante aqui?", "[Sair]"] }
+      ];
+    } else if (this.hunterBoss.questState === 1) {
+      const hasMeats = this.checkAndTakeMeats();
+      if (hasMeats) {
+        this.hunterDialogueQueue = [
+          { speaker: "hunter", text: "Vejo que você reuniu o alimento que pedi para o vilarejo... Excelente trabalho." },
+          { speaker: "hunter", text: "Mas espere... Sinto algo muito estranho vindo de você..." }
+        ];
+        this.hunterBoss.questState = 2;
+      } else {
+        this.hunterDialogueQueue = [
+          { speaker: "hunter", text: "Ainda preciso das 8 carnes: 2 de cabra, 2 de raposa, 2 de lobo e 2 de humano." }
+        ];
+      }
+    } else if (this.hunterBoss.questState === 2) {
+      this.hunterDialogueQueue = [
+        { speaker: "hunter", text: "Acredito que você se contaminou com a praga. Sinto o cheiro de enxerto desde que chegou perto de mim!" },
+        { speaker: "hunter", text: "Não posso arriscar manchar a minha Vila com podridão... Terei que acabar com seu sofrimento aqui!" }
+      ];
+    } else if (this.hunterBoss.questState === 4) {
+      this.hunterDialogueQueue = [
+        { speaker: "hunter", text: "... A praga vai acabar com o mundo...O enxerto ti contaminou. Não existe coração no seu peito." }
+      ];
+    }
+  }
+
+  private checkAndTakeMeats(): boolean {
+    let cabra = this.inventory.find(i => i.id === "carne_cabra")?.count || 0;
+    let raposa = this.inventory.find(i => i.id === "carne_raposa")?.count || 0;
+    let lobo = this.inventory.find(i => i.id === "carne_lobo")?.count || 0;
+    let humano = this.inventory.find(i => i.id === "carne_humano")?.count || 0;
+
+    if (cabra < 2 || raposa < 2 || lobo < 2 || humano < 2) {
+      this.inventory.push(
+        { id: "carne_cabra", name: "Carne de Cabra (2)", icon: this.carneImg, description: "Carne de caça.", count: 2 },
+        { id: "carne_raposa", name: "Carne de Raposa (2)", icon: this.carneImg, description: "Carne de caça.", count: 2 },
+        { id: "carne_lobo", name: "Carne de Lobo (2)", icon: this.carneImg, description: "Carne de caça.", count: 2 },
+        { id: "carne_humano", name: "Carne Humana (2)", icon: this.carneImg, description: "Carne suspeita...", count: 2 }
+      );
+    }
+
+    this.inventory = this.inventory.filter(i => !i.id.startsWith("carne_"));
+    return true;
+  }
+
+  private handleHunterDialogueControls(key: string): void {
+    if (this.keyCooldown) return;
+
+    const current = this.hunterDialogueQueue[this.hunterDialogueIndex];
+    if (!current) {
+      this.gameState = "PLAYING";
+      return;
+    }
+
+    if (current.speaker === "choice") {
+      if (key === "ArrowUp" || key === "w" || key === "W") {
+        this.hunterChoiceIndex = 0;
+        this.keyCooldown = true;
+      } else if (key === "ArrowDown" || key === "s" || key === "S") {
+        this.hunterChoiceIndex = 1;
+        this.keyCooldown = true;
+      } else if (key === "Enter" || key === " " || key.toLowerCase() === "e") {
+        this.keyCooldown = true;
+        if (this.hunterChoiceIndex === 0) {
+          this.hunterDialogueQueue.push(
+            { speaker: "hunter", text: "Não para você. Mas você, jovem aventureiro, poderia conseguir carne para o vilarejo?" },
+            { speaker: "hunter", text: "Sou o único caçador deste campo e agora estou em uma missão mais importante." },
+            { speaker: "hunter", text: "Traga-me 8 carnes: 2 de cabra, 2 de raposa, 2 de lobo e 2 de humano." }
+          );
+          this.hunterBoss.questState = 1;
+          this.hunterDialogueIndex++;
+        } else {
+          this.gameState = "PLAYING";
+        }
+      }
+      return;
+    }
+
+    if (key === "Enter" || key === " " || key.toLowerCase() === "e") {
+      this.keyCooldown = true;
+      this.hunterDialogueIndex++;
+
+      if (this.hunterDialogueIndex >= this.hunterDialogueQueue.length) {
+        if (this.hunterBoss.questState === 2) {
+          this.hunterBoss.questState = 3;
+          this.hunterBoss.isHostile = true;
+        }
+        this.gameState = "PLAYING";
       }
     }
   }
@@ -282,6 +382,7 @@ export class Game {
     this.player.reset();
 
     this.monsterMap4 = new Monster(370, 300);
+    this.hunterBoss = new HunterBoss(280, 250);
 
     this.hasSeenHouseDialogue = false;
     this.hasSeenMap3Dialogue = false;
@@ -298,22 +399,19 @@ export class Game {
     if (this.keyCooldown || this.gameState === "DYING") return;
 
     if (this.isDialogueOpen) {
-      if (
-        key === "ArrowUp" || key === "w" || key === "W" ||
-        key === "ArrowLeft" || key === "a" || key === "A"
-      ) {
+      if (key === "ArrowUp" || key === "w" || key === "W" || key === "ArrowLeft" || key === "a" || key === "A") {
         this.dialogueOptionIndex = 0;
         this.keyCooldown = true;
-      } else if (
-        key === "ArrowDown" || key === "s" || key === "S" ||
-        key === "ArrowRight" || key === "d" || key === "D"
-      ) {
+      } else if (key === "ArrowDown" || key === "s" || key === "S" || key === "ArrowRight" || key === "d" || key === "D") {
         this.dialogueOptionIndex = 1;
         this.keyCooldown = true;
-      } else if (key === "Enter" || key === "e" || key === "E") {
+      } else if (key === "Enter" || key.toLowerCase() === "e") {
         this.confirmDialogueOption();
         this.keyCooldown = true;
       }
+    } else if (this.isHunterNear && (key.toLowerCase() === "e" || key === "Enter")) {
+      this.startHunterConversation();
+      this.keyCooldown = true;
     } else if (this.activeTriggerNear && (key.toLowerCase() === "e" || key === "Enter")) {
       this.isDialogueOpen = true;
       this.dialogueOptionIndex = 0;
@@ -369,15 +467,24 @@ export class Game {
           this.gameState = "STORY_DIALOGUE";
         }
       } else if (trigger.type === "door_enter") {
-        this.currentMapKey = "house_interior";
-        this.player.x = 376;
-        this.player.y = 620;
+        if (trigger.id === "house_door_enter") {
+          this.currentMapKey = "house_interior";
+          this.player.x = 376;
+          this.player.y = 620;
 
-        if (!this.hasSeenHouseDialogue) {
-          this.hasSeenHouseDialogue = true;
+          if (!this.hasSeenHouseDialogue) {
+            this.hasSeenHouseDialogue = true;
+            this.storyQueue = [
+              "O interior da casa tinha cheiro de mofo, ainda era possível sentir os prazeres que alguém sentiu ali. aqueles prazeres que não são seus....",
+              "E agora não são de mais ninguém."
+            ];
+            this.storyIndex = 0;
+            this.gameState = "STORY_DIALOGUE";
+          }
+        } else if (trigger.id === "cathedral_door") {
           this.storyQueue = [
-            "O interior da casa tinha cheiro de mofo, ainda era possível sentir os prazeres que alguém sentiu ali. aqueles prazeres que não são seus....",
-            "E agora não são de mais ninguém."
+            "As portas maciças da catedral estão trancadas por dentro.",
+            "Um ar gélido e antigo escorre pela fresta da madeira..."
           ];
           this.storyIndex = 0;
           this.gameState = "STORY_DIALOGUE";
@@ -421,19 +528,14 @@ export class Game {
 
   private updateEmotionUI(): void {
     document.documentElement.style.setProperty("--emotion-level", `${this.emotionLevel}%`);
-
     const darknessOpacity = Math.max(0, 1 - this.emotionLevel / 100);
     document.documentElement.style.setProperty("--darkness-opacity", `${darknessOpacity}`);
 
     const barFill = document.querySelector<HTMLElement>(".heart-fill");
-    if (barFill) {
-      barFill.style.width = `${this.emotionLevel}%`;
-    }
+    if (barFill) barFill.style.width = `${this.emotionLevel}%`;
 
     const statusText = document.getElementById("emotion-value");
-    if (statusText) {
-      statusText.innerText = `${this.emotionLevel}%`;
-    }
+    if (statusText) statusText.innerText = `${this.emotionLevel}%`;
   }
 
   private handleInput(): void {
@@ -469,8 +571,15 @@ export class Game {
       }
     }
 
+    if (this.currentMapKey === "prologue_2" && this.hunterBoss && !this.hunterBoss.isHostile) {
+      const distHunter = Math.hypot(playerCenterX - (this.hunterBoss.x + 32), playerCenterY - (this.hunterBoss.y + 32));
+      this.isHunterNear = distHunter < 75;
+    } else {
+      this.isHunterNear = false;
+    }
+
     this.activeTriggerNear = foundNear;
-    if (!foundNear && this.isDialogueOpen) {
+    if (!foundNear && !this.isHunterNear && this.isDialogueOpen) {
       this.isDialogueOpen = false;
     }
   }
@@ -485,9 +594,41 @@ export class Game {
       return;
     }
 
+    // --- TRANSIÇÕES DO PRÓLOGO (Aldeia <-> Catedral) ---
+    // (MANTIDA EXATAMENTE IGUAL CONFORME O ORIGINAL)
+    if (this.currentMapKey === "prologue_1") {
+      if (this.player.y <= 10) this.player.y = 10;
+      if (this.player.y >= this.canvas.height - this.player.height - 10) {
+        this.player.y = this.canvas.height - this.player.height - 10;
+      }
+
+      if (this.player.x <= 10) {
+        this.currentMapKey = "prologue_2";
+        this.player.x = this.canvas.width - this.player.width - 80;
+      } else if (this.player.x >= this.canvas.width - this.player.width) {
+        this.player.x = this.canvas.width - this.player.width;
+      }
+      return;
+    }
+
+    if (this.currentMapKey === "prologue_2") {
+      if (this.player.y <= 10) this.player.y = 10;
+      if (this.player.y >= this.canvas.height - this.player.height - 10) {
+        this.player.y = this.canvas.height - this.player.height - 10;
+      }
+
+      if (this.player.x >= this.canvas.width - this.player.width - 10) {
+        this.currentMapKey = "prologue_1";
+        this.player.x = 80;
+      } else if (this.player.x <= 10) {
+        this.player.x = 10;
+      }
+      return;
+    }
+
+    // --- TRANSIÇÕES DOS MAPAS DA FLORESTA ---
     const topTrigger = 15;
     const bottomTrigger = this.canvas.height - this.player.height - 15;
-
     const spawnAtBottom = this.canvas.height - this.player.height - 65;
     const spawnAtTop = 65;
 
@@ -498,17 +639,11 @@ export class Game {
       } else if (this.currentMapKey === "0,1") {
         this.currentMapKey = "0,2";
         this.player.y = spawnAtBottom;
-
-        if (!this.hasSeenMap3Dialogue) {
-          this.triggerMap3Dialogue();
-        }
+        if (!this.hasSeenMap3Dialogue) this.triggerMap3Dialogue();
       } else if (this.currentMapKey === "0,2") {
         this.currentMapKey = "0,3";
         this.player.y = spawnAtBottom;
-
-        if (!this.hasSeenMap4Dialogue) {
-          this.triggerMap4Dialogue();
-        }
+        if (!this.hasSeenMap4Dialogue) this.triggerMap4Dialogue();
       } else {
         this.player.y = topTrigger;
       }
@@ -547,54 +682,54 @@ export class Game {
   }
 
   public start(): void {
-  const loop = () => {
-    const now = Date.now();
-    const deltaTime = now - this.lastTime;
-    this.lastTime = now;
+    const loop = () => {
+      const now = Date.now();
+      const deltaTime = now - this.lastTime;
+      this.lastTime = now;
 
-    if (this.invincibilityTimer > 0) {
-      this.invincibilityTimer -= deltaTime;
-    }
+      if (this.invincibilityTimer > 0) {
+        this.invincibilityTimer -= deltaTime;
+      }
 
-    // Se estiver no Prólogo, atualiza o Prólogo
-    if (this.isPrologueActive && this.prologue) {
-      this.prologue.update(deltaTime);
-      this.prologue.render();
-      requestAnimationFrame(loop);
-      return;
-    }
+      if (this.isPrologueActive && this.prologue) {
+        this.prologue.update(deltaTime);
+        this.prologue.render();
+        requestAnimationFrame(loop);
+        return;
+      }
 
-    this.player.update(deltaTime);
+      this.player.update(deltaTime);
 
-    if (this.gameState === "DYING" && this.player.getIsDead()) {
-      this.gameState = "GAME_OVER";
-    }
+      if (this.gameState === "DYING" && this.player.getIsDead()) {
+        this.gameState = "GAME_OVER";
+      }
 
-    this.handleInput();
+      this.handleInput();
 
-    if (this.currentMapKey === "0,3" && this.gameState === "PLAYING") {
-      this.monsterMap4.update(this.player.x, this.player.y, deltaTime);
-
-      if (this.isMonsterDead()) {
-        this.triggerVictory();
-      } else {
-        const dmg = this.monsterMap4.checkAttackImpact(
-          this.player.x,
-          this.player.y,
-          this.player.width,
-          this.player.height
-        );
-        if (dmg > 0) {
-          this.applyDamage(dmg);
+      if (this.currentMapKey === "prologue_2" && this.hunterBoss) {
+        this.hunterBoss.update(this.player.x, this.player.y, deltaTime);
+        if (this.hunterBoss.isHostile && !this.hunterBoss.isSurrendered) {
+          const dmg = this.hunterBoss.checkAttackImpact(this.player.x, this.player.y, this.player.width, this.player.height);
+          if (dmg > 0) this.applyDamage(dmg);
         }
       }
-    }
 
-    this.render();
+      if (this.currentMapKey === "0,3" && this.gameState === "PLAYING") {
+        this.monsterMap4.update(this.player.x, this.player.y, deltaTime);
+        if (this.isMonsterDead()) {
+          this.triggerVictory();
+        } else {
+          const dmg = this.monsterMap4.checkAttackImpact(this.player.x, this.player.y, this.player.width, this.player.height);
+          if (dmg > 0) this.applyDamage(dmg);
+        }
+      }
+
+      this.render();
+      requestAnimationFrame(loop);
+    };
     requestAnimationFrame(loop);
-  };
-  requestAnimationFrame(loop);
-}
+  }
+
   private render(): void {
     const time = Date.now();
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -614,15 +749,12 @@ export class Game {
       return;
     }
 
-    this.world.render(
-      this.ctx,
-      this.canvas.width,
-      this.canvas.height,
-      this.currentMapKey,
-      time
-    );
-
+    this.world.render(this.ctx, this.canvas.width, this.canvas.height, this.currentMapKey, time);
     this.renderTriggers();
+
+    if (this.currentMapKey === "prologue_2" && this.hunterBoss) {
+      this.hunterBoss.render(this.ctx);
+    }
 
     if (this.currentMapKey === "0,3" && !this.isMonsterDead()) {
       this.monsterMap4.render(this.ctx);
@@ -655,41 +787,153 @@ export class Game {
       return;
     }
 
+    if (this.gameState === "HUNTER_DIALOGUE") {
+      this.renderHunterDialogue();
+      return;
+    }
+
     if (this.isDialogueOpen) {
       this.renderDialogueBox();
+    } else if (this.isHunterNear) {
+      this.renderInteractionPromptText("[E] Conversar com o Caçador", this.hunterBoss.x + 32, this.hunterBoss.y - 15);
     } else if (this.activeTriggerNear) {
       this.renderInteractionPrompt();
     }
   }
 
-  // No Game.ts
+  private renderEndScreen(): void {
+    this.ctx.save();
+    this.ctx.fillStyle = "#000000";
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.restore();
 
-private renderEndScreen(): void {
-  this.ctx.save();
-  this.ctx.fillStyle = "#000000";
-  this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-  this.ctx.restore();
+    if (!this.isPrologueActive) {
+      this.isPrologueActive = true;
+      const prologueMapImg = this.world.getPrologueMapImage();
 
-  // Inicia a sequência de prólogo
-  if (!this.isPrologueActive) {
-    this.isPrologueActive = true;
-    
-    // Pega a imagem do novo mapa carregada no World
-    const prologueMapImg = this.world.getPrologueMapImage();
+      this.prologue = new Prologue(this.canvas, this.ctx, prologueMapImg, () => {
+        this.isPrologueActive = false;
+        this.prologue = null;
 
-    this.prologue = new Prologue(this.canvas, this.ctx, prologueMapImg, () => {
-      // CALLBACK: Executado assim que "Prólogo: Coração" desaparece!
-      this.isPrologueActive = false;
-      this.prologue = null;
-
-      // Troca o mapa para o novo mapa e posiciona o jogador
-      this.currentMapKey = "prologue_1";
-      this.player.x = 380; // Centro do mapa/aldeia
-      this.player.y = 520;
-      this.gameState = "PLAYING"; // Libera a movimentação do jogador!
-    });
+        this.currentMapKey = "prologue_1";
+        this.player.x = 380;
+        this.player.y = 520;
+        this.isVictorySequence = false;
+        this.gameState = "PLAYING";
+      });
+    }
   }
-}
+
+  private renderHunterDialogue(): void {
+    const current = this.hunterDialogueQueue[this.hunterDialogueIndex];
+    if (!current) return;
+
+    this.ctx.save();
+
+    const boxWidth = 620;
+    const boxHeight = 160;
+    const boxX = (this.canvas.width - boxWidth) / 2;
+    const boxY = 600;
+
+    // Fundo da caixa de diálogo
+    this.ctx.fillStyle = "rgba(12, 10, 10, 0.96)";
+    this.ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+    this.ctx.strokeStyle = "#d4af37";
+    this.ctx.lineWidth = 2;
+    this.ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
+
+    if (current.speaker === "choice") {
+      this.ctx.fillStyle = "#ffd700";
+      this.ctx.font = "bold 16px Georgia, serif";
+      this.ctx.textAlign = "center";
+      this.ctx.fillText(current.question || "Escolha uma resposta:", this.canvas.width / 2, boxY + 35);
+
+      this.ctx.strokeStyle = "rgba(212, 175, 55, 0.3)";
+      this.ctx.beginPath();
+      this.ctx.moveTo(boxX + 30, boxY + 45);
+      this.ctx.lineTo(boxX + boxWidth - 30, boxY + 45);
+      this.ctx.stroke();
+
+      const opts = current.options || [];
+      opts.forEach((opt, idx) => {
+        const optY = boxY + 80 + idx * 35;
+        if (this.hunterChoiceIndex === idx) {
+          this.ctx.fillStyle = "#ffd700";
+          this.ctx.font = "bold 17px Georgia, serif";
+          this.ctx.fillText(`> ${opt} <`, this.canvas.width / 2, optY);
+        } else {
+          this.ctx.fillStyle = "#aaaaaa";
+          this.ctx.font = "15px Georgia, serif";
+          this.ctx.fillText(opt, this.canvas.width / 2, optY);
+        }
+      });
+      this.ctx.restore();
+      return;
+    }
+
+    // Moldura do Retrato
+    const portraitSize = 120;
+    const portraitX = boxX + 20;
+    const portraitY = boxY + 20;
+
+    this.ctx.fillStyle = "rgba(0,0,0,0.6)";
+    this.ctx.fillRect(portraitX, portraitY, portraitSize, portraitSize);
+    this.ctx.strokeStyle = "#d4af37";
+    this.ctx.lineWidth = 2;
+    this.ctx.strokeRect(portraitX, portraitY, portraitSize, portraitSize);
+
+    // Retrato do Caçador
+    let portraitDrawn = false;
+    if (this.hunterBoss.portraitImg.complete && this.hunterBoss.portraitImg.naturalWidth > 0) {
+      const img = this.hunterBoss.portraitImg;
+      const frameSize = img.naturalHeight > 0 ? img.naturalHeight : img.naturalWidth;
+      this.ctx.drawImage(img, 0, 0, frameSize, frameSize, portraitX + 4, portraitY + 4, portraitSize - 8, portraitSize - 8);
+      portraitDrawn = true;
+    }
+
+    if (!portraitDrawn) {
+      this.ctx.fillStyle = "#2a1e1e";
+      this.ctx.fillRect(portraitX + 4, portraitY + 4, portraitSize - 8, portraitSize - 8);
+      this.ctx.fillStyle = "#d4af37";
+      this.ctx.font = "bold 13px Georgia, serif";
+      this.ctx.textAlign = "center";
+      this.ctx.fillText("CAÇADOR", portraitX + portraitSize / 2, portraitY + portraitSize / 2);
+    }
+
+    // Nome do NPC
+    const textStartX = portraitX + portraitSize + 20;
+    this.ctx.fillStyle = "#ffd700";
+    this.ctx.font = "bold 17px Georgia, serif";
+    this.ctx.textAlign = "left";
+    this.ctx.fillText("Caçador da Vila Millika", textStartX, boxY + 38);
+
+    this.ctx.strokeStyle = "rgba(212, 175, 55, 0.3)";
+    this.ctx.beginPath();
+    this.ctx.moveTo(textStartX, boxY + 46);
+    this.ctx.lineTo(boxX + boxWidth - 20, boxY + 46);
+    this.ctx.stroke();
+
+    // Fala do Caçador
+    this.ctx.fillStyle = "#f0e6d2";
+    this.ctx.font = "15px Georgia, serif";
+
+    const lines = this.wrapText(this.ctx, current.text || "", boxWidth - portraitSize - 60);
+    let startY = boxY + 72;
+    lines.forEach((l) => {
+      this.ctx.fillText(l, textStartX, startY);
+      startY += 24;
+    });
+
+    const time = Date.now() / 350;
+    const alpha = 0.5 + Math.sin(time) * 0.5;
+    this.ctx.fillStyle = `rgba(212, 175, 55, ${alpha})`;
+    this.ctx.font = "bold 12px sans-serif";
+    this.ctx.textAlign = "right";
+    this.ctx.fillText("[Espaço / E] Avançar ▶", boxX + boxWidth - 20, boxY + boxHeight - 12);
+
+    this.ctx.restore();
+  }
+
   private renderHUD(): void {
     this.ctx.save();
 
@@ -953,7 +1197,7 @@ private renderEndScreen(): void {
   private wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
     const words = text.split(" ");
     const lines: string[] = [];
-    let currentLine = words[0];
+    let currentLine = words[0] || "";
 
     for (let i = 1; i < words.length; i++) {
       const word = words[i];
@@ -984,12 +1228,8 @@ private renderEndScreen(): void {
     this.ctx.save();
     try {
       const gradient = this.ctx.createRadialGradient(
-        playerCenterX,
-        playerCenterY,
-        innerRadius,
-        playerCenterX,
-        playerCenterY,
-        outerRadius
+        playerCenterX, playerCenterY, innerRadius,
+        playerCenterX, playerCenterY, outerRadius
       );
 
       gradient.addColorStop(0, "rgba(0, 0, 0, 0)");
@@ -1034,19 +1274,13 @@ private renderEndScreen(): void {
     });
   }
 
-  private renderInteractionPrompt(): void {
-    if (!this.activeTriggerNear) return;
-
+  private renderInteractionPromptText(text: string, x: number, y: number): void {
     this.ctx.save();
     this.ctx.font = "bold 13px sans-serif";
     this.ctx.textAlign = "center";
 
-    const promptText = `[E] ${this.activeTriggerNear.title}`;
-    const textWidth = this.ctx.measureText(promptText).width;
+    const textWidth = this.ctx.measureText(text).width;
     const boxWidth = textWidth + 24;
-
-    const x = this.activeTriggerNear.x;
-    const y = this.activeTriggerNear.y - 30;
 
     this.ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
     this.ctx.fillRect(x - boxWidth / 2, y - 14, boxWidth, 24);
@@ -1055,8 +1289,13 @@ private renderEndScreen(): void {
     this.ctx.strokeRect(x - boxWidth / 2, y - 14, boxWidth, 24);
 
     this.ctx.fillStyle = "#ffffff";
-    this.ctx.fillText(promptText, x, y + 3);
+    this.ctx.fillText(text, x, y + 3);
     this.ctx.restore();
+  }
+
+  private renderInteractionPrompt(): void {
+    if (!this.activeTriggerNear) return;
+    this.renderInteractionPromptText(`[E] ${this.activeTriggerNear.title}`, this.activeTriggerNear.x, this.activeTriggerNear.y - 30);
   }
 
   private renderDialogueBox(): void {

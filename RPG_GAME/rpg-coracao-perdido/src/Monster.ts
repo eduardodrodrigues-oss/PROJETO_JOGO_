@@ -13,8 +13,8 @@ export class Monster {
   public height: number = 128;
 
   // --- SISTEMA DE VIDA E DANO ---
-  public hp: number = 100;
-  public maxHp: number = 100;
+  public hp: number = 500;
+  public maxHp: number = 500;
   private hurtTimer: number = 0; // Tempo que fica piscando ao levar dano
 
   private state: MonsterState = "IDLE";

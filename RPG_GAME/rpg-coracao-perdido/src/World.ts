@@ -26,8 +26,8 @@ export class World {
       { id: "0,2", src: "/assets/map3.png" },
       { id: "0,3", src: "/assets/map4.png" },
       { id: "house_interior", src: "/assets/house_interior.png" },
-      // Novo mapa do Prólogo (Aldeia Corrompida Sob o Castelo)
-      { id: "prologue_1", src: "/assets/Aldeia Corrompida Sob o Castelo.png" }
+      { id: "prologue_1", src: "/assets/Aldeia Corrompida Sob o Castelo.png" },
+      { id: "prologue_2", src: "/assets/Catedral Gótica ao Luar.png" }
     ];
 
     mapsToLoad.forEach((mapInfo) => {
@@ -87,24 +87,27 @@ export class World {
       type: "item",
       collected: false
     });
+
+    // Ponto de interação na porta da Catedral no Prólogo
+    this.triggers.push({
+      id: "cathedral_door",
+      mapKey: "prologue_2",
+      x: 500,
+      y: 260,
+      title: "Examinar Porta da Catedral",
+      type: "door_enter"
+    });
   }
 
   public getObstacles(mapKey: string): Rect[] {
     if (mapKey === "0,2") {
       return [
-        // --- CASA ---
         { x: 260, y: 220, width: 115, height: 150 },
         { x: 455, y: 220, width: 105, height: 150 },
         { x: 375, y: 220, width: 80, height: 110 },
-
-        // --- POÇO ---
         { x: 650, y: 285, width: 58, height: 90 },
-
-        // --- OBSTÁCULOS SECUNDÁRIOS ---
         { x: 140, y: 520, width: 70, height: 50 },
         { x: 180, y: 405, width: 70, height: 25 },
-
-        // Paredes laterais de árvores
         { x: 0, y: 0, width: 100, height: 600 },
         { x: 700, y: 0, width: 100, height: 600 }
       ];
@@ -112,11 +115,8 @@ export class World {
 
     if (mapKey === "0,3") {
       return [
-        // Paredes laterais recuadas no topo
         { x: 0, y: 100, width: 100, height: 700 },
         { x: 700, y: 100, width: 100, height: 700 },
-
-        // Pedras e troncos do meio para o fim do mapa
         { x: 525, y: 300, width: 70, height: 65 },
         { x: 230, y: 470, width: 70, height: 60 },
         { x: 570, y: 670, width: 65, height: 55 }
@@ -134,32 +134,27 @@ export class World {
       ];
     }
 
-    // --- PRIMEIRO MAPA DO PRÓLOGO (Aldeia Corrompida Sob o Castelo) ---
+    // --- ALDEIA CORROMPIDA (prologue_1) ---
     if (mapKey === "prologue_1") {
       return [
-        // Muralha e Portão do Castelo à direita
-        { x: 680, y: 0, width: 120, height: 800 },
-
-        // Ruínas / Casa superior esquerda
-        { x: 60, y: 100, width: 180, height: 130 },
-
-        // Ruínas / Casa superior centro
+        { x: 680, y: 0, width: 120, height: 800 }, // Muralha da direita
+        { x: 100, y: 100, width: 180, height: 130 },
         { x: 380, y: 20, width: 140, height: 130 },
-
-        // Poço / Cercas do lado esquerdo
-        { x: 0, y: 340, width: 110, height: 120 },
-
-        // Casa do meio esquerda
+        // A colisão da borda esquerda (x = 0 a 80) foi totalmente removida para permitir a troca de mapa
         { x: 130, y: 440, width: 150, height: 130 },
-
-        // Casa inferior esquerda
-        { x: 50, y: 640, width: 170, height: 140 },
-
-        // Casa inferior centro
+        { x: 100, y: 640, width: 170, height: 140 },
         { x: 420, y: 650, width: 160, height: 130 },
-
-        // Restos de fogueira / corrupção no centro
         { x: 430, y: 430, width: 80, height: 60 }
+      ];
+    }
+
+    // --- CAPELA / CATEDRAL GÓTICA (prologue_2) ---
+    if (mapKey === "prologue_2") {
+      return [
+        // Estrutura física da Catedral no topo
+        { x: 250, y: 0, width: 500, height: 260 },
+        { x: 0, y: 0, width: 250, height: 180 }
+        // Removida a colisão da borda direita para garantir livre navegação de retorno ao prologue_1
       ];
     }
 
@@ -202,6 +197,24 @@ export class World {
   ): void {
     ctx.save();
 
+    if (mapKey === "prologue_1" || mapKey === "prologue_2") {
+      const particleCount = 12;
+      for (let i = 0; i < particleCount; i++) {
+        const speed = 0.02 + (i % 4) * 0.01;
+        const pX = ((time * speed + i * 137) % (width + 100)) - 50;
+        const pY = (i * 93 + Math.sin(time * 0.002 + i) * 20) % height;
+        const size = 1 + (i % 2);
+
+        ctx.fillStyle = i % 2 === 0 ? "rgba(255, 200, 120, 0.3)" : "rgba(200, 200, 255, 0.2)";
+        ctx.beginPath();
+        ctx.arc(pX, pY, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+      return;
+    }
+
     const swayX = Math.sin(time * 0.0015) * 8;
     const swayY = Math.cos(time * 0.0012) * 4;
 
@@ -243,16 +256,13 @@ export class World {
     for (const trigger of activeTriggers) {
       if (trigger.type === "item") {
         ctx.save();
-
         const x = trigger.x;
         const floatOffsetY = Math.sin(animTime) * 4;
         const y = trigger.y + floatOffsetY;
 
         if (trigger.id === "espada_item") {
-          // --- VISUAL DE ESPADA NO MAPA ---
           ctx.shadowColor = "#ffd700";
           ctx.shadowBlur = 10 + Math.sin(animTime) * 5;
-
           ctx.strokeStyle = "#e0e0e0";
           ctx.lineWidth = 3;
           ctx.beginPath();
@@ -267,15 +277,13 @@ export class World {
           ctx.lineTo(x + 6, y + 3);
           ctx.stroke();
         } else {
-          // --- VISUAL DE CORAÇÃO ---
           ctx.shadowColor = "#ff2a55";
           ctx.shadowBlur = 12 + Math.sin(animTime) * 6;
-
           const size = 12;
           ctx.fillStyle = "#ff1a4a";
           ctx.beginPath();
           ctx.arc(x - size / 2, y - size / 2, size / 2, Math.PI, 0, false);
-          ctx.arc(x + size / 2, y - size / 2, size / 2, Math.PI, 0, false);
+          ctx.arc(x + size / 2, y - size / 2, size / 4, Math.PI, 0, false);
           ctx.lineTo(x, y + size);
           ctx.closePath();
           ctx.fill();

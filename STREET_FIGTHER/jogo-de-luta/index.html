@@ -3,23 +3,35 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Jogo de Luta 2D</title>
-  <link rel="stylesheet" href="/src/style.css" />
+  <title>Jogo de Luta</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="game-container">
-    <!-- Interface (HUD): Barras de Vida e Tempo -->
     <div class="hud">
-      <div class="health-container">
-        <div id="player1Health" class="health-bar player1"></div>
+      <div class="health-bar"><div id="player1Health" class="health-fill"></div></div>
+      <div id="timer">60</div>
+      <div class="health-bar"><div id="player2Health" class="health-fill"></div></div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Painel de Controles na Tela para o Player 2 -->
+    <div class="controls-panel">
+      <div class="control-group movement">
+        <button id="btnLeft">◄ Esquerda</button>
+        <button id="btnJump">▲ Pular</button>
+        <button id="btnRight">Direita ►</button>
       </div>
-      <div id="timer" class="timer">60</div>
-      <div class="health-container">
-        <div id="player2Health" class="health-bar player2"></div>
+      <div class="control-group actions">
+        <button id="btnAttack" class="btn-action">Soco (Z)</button>
+        <button id="btnShield" class="btn-action">Escudo (X)</button>
+        <button id="btnSpecial" class="btn-action btn-special">Especial (C)</button>
+        <button id="btnDefend" class="btn-action btn-defend">Defesa (V)</button>
       </div>
     </div>
-    <canvas id="gameCanvas"></canvas>
   </div>
+
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
