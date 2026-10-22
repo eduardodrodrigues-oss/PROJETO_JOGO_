@@ -47,11 +47,9 @@ export class Game {
   private hasSeenHouseDialogue: boolean = false;
   private isVictorySequence: boolean = false;
 
-  // Diálogos Gerais
   private storyQueue: string[] = [];
   private storyIndex: number = 0;
 
-  // Diálogo do Caçador com Retrato
   private hunterDialogueQueue: { speaker: "hunter" | "choice"; text?: string; question?: string; options?: string[] }[] = [];
   private hunterDialogueIndex: number = 0;
   private hunterChoiceIndex: number = 0;
@@ -86,7 +84,6 @@ export class Game {
     this.monsterMap4 = new Monster(370, 300);
     this.hunterBoss = new HunterBoss(280, 250);
 
-    // Sprites
     this.mochilaImg = new Image();
     this.mochilaImg.src = "/assets/mochila.png";
 
@@ -267,15 +264,17 @@ export class Game {
 
     if (this.hunterBoss.questState === 0) {
       this.hunterDialogueQueue = [
-        { speaker: "hunter", text: " Nunca vi você nessas terras... Sangue, há muito sangue por aqui." },
+        { speaker: "hunter", text: "Nunca vi você por estas terras... Sangue, há muito sangue por aqui." },
         { speaker: "choice", question: "Como deseja responder?", options: ["Existe algo importante aqui?", "[Sair]"] }
       ];
     } else if (this.hunterBoss.questState === 1) {
       const hasMeats = this.checkAndTakeMeats();
       if (hasMeats) {
         this.hunterDialogueQueue = [
-          { speaker: "hunter", text: "Vejo que você reuniu o alimento que pedi para o vilarejo... Excelente trabalho." },
-          { speaker: "hunter", text: "Mas espere... Sinto algo muito estranho vindo de você..." }
+          { speaker: "hunter", text: "Obrigado. Jovem. " },
+          { speaker: "hunter", text: "Acredito que você nessas viagens se contaminou com a praga. Sinto cheiro de enxerto, desde que chegou perto de mim..." },
+          { speaker: "hunter", text: "Não posso arriscar manchar a minha Vila de podridão... " },
+          { speaker: "hunter", text: "Pobre alma, terei que acabar com o seu sofrimento aqui, perto da grande catedral uma linda morte." }
         ];
         this.hunterBoss.questState = 2;
       } else {
@@ -285,33 +284,33 @@ export class Game {
       }
     } else if (this.hunterBoss.questState === 2) {
       this.hunterDialogueQueue = [
-        { speaker: "hunter", text: "Acredito que você se contaminou com a praga. Sinto o cheiro de enxerto desde que chegou perto de mim!" },
-        { speaker: "hunter", text: "Não posso arriscar manchar a minha Vila com podridão... Terei que acabar com seu sofrimento aqui!" }
+        { speaker: "hunter", text: "Acredito que você nessas viagens se contaminou com a praga. Sinto cheiro de enxerto, desde que chegou perto de mim..." },
+        { speaker: "hunter", text: "Não posso arriscar manchar a minha Vila de podridão... " },
+        { speaker: "hunter", text: "Pobre alma, terei que acabar com o seu sofrimento aqui, perto da grande catedral uma linda morte." }
       ];
     } else if (this.hunterBoss.questState === 4) {
       this.hunterDialogueQueue = [
-        { speaker: "hunter", text: "... A praga vai acabar com o mundo...O enxerto ti contaminou. Não existe coração no seu peito." }
+        { speaker: "hunter", text: "... A praga é forte demais... Não tenho mais forças para lutar." }
       ];
     }
   }
 
   private checkAndTakeMeats(): boolean {
-    let cabra = this.inventory.find(i => i.id === "carne_cabra")?.count || 0;
-    let raposa = this.inventory.find(i => i.id === "carne_raposa")?.count || 0;
-    let lobo = this.inventory.find(i => i.id === "carne_lobo")?.count || 0;
-    let humano = this.inventory.find(i => i.id === "carne_humano")?.count || 0;
+    const cabraItem = this.inventory.find(i => i.id === "carne_cabra");
+    const raposaItem = this.inventory.find(i => i.id === "carne_raposa");
+    const loboItem = this.inventory.find(i => i.id === "carne_lobo");
+    const humanoItem = this.inventory.find(i => i.id === "carne_humano");
 
-    if (cabra < 2 || raposa < 2 || lobo < 2 || humano < 2) {
-      this.inventory.push(
-        { id: "carne_cabra", name: "Carne de Cabra (2)", icon: this.carneImg, description: "Carne de caça.", count: 2 },
-        { id: "carne_raposa", name: "Carne de Raposa (2)", icon: this.carneImg, description: "Carne de caça.", count: 2 },
-        { id: "carne_lobo", name: "Carne de Lobo (2)", icon: this.carneImg, description: "Carne de caça.", count: 2 },
-        { id: "carne_humano", name: "Carne Humana (2)", icon: this.carneImg, description: "Carne suspeita...", count: 2 }
-      );
+    const cabra = cabraItem?.count || 0;
+    const raposa = raposaItem?.count || 0;
+    const lobo = loboItem?.count || 0;
+    const humano = humanoItem?.count || 0;
+
+    if (cabra >= 2 && raposa >= 2 && lobo >= 2 && humano >= 2) {
+      this.inventory = this.inventory.filter(i => !i.id.startsWith("carne_"));
+      return true;
     }
-
-    this.inventory = this.inventory.filter(i => !i.id.startsWith("carne_"));
-    return true;
+    return false;
   }
 
   private handleHunterDialogueControls(key: string): void {
@@ -334,9 +333,8 @@ export class Game {
         this.keyCooldown = true;
         if (this.hunterChoiceIndex === 0) {
           this.hunterDialogueQueue.push(
-            { speaker: "hunter", text: "Não para você. Mas você, jovem aventureiro, poderia conseguir carne para o vilarejo?" },
-            { speaker: "hunter", text: "Sou o único caçador deste campo e agora estou em uma missão mais importante." },
-            { speaker: "hunter", text: "Traga-me 8 carnes: 2 de cabra, 2 de raposa, 2 de lobo e 2 de humano." }
+            { speaker: "hunter", text: "Não, para você." },
+            { speaker: "hunter", text: "Você jovem aventureiro, poderia conseguir carne para o vilarejo? Sou o único caçador desse campo e agora, estou em uma missão mais importante." }
           );
           this.hunterBoss.questState = 1;
           this.hunterDialogueIndex++;
@@ -419,6 +417,22 @@ export class Game {
     }
   }
 
+  private addMeatToInventory(typeId: string, name: string): void {
+    const existing = this.inventory.find(i => i.id === typeId);
+    if (existing) {
+      existing.count = (existing.count || 1) + 1;
+      existing.name = `${name} (${existing.count})`;
+    } else {
+      this.inventory.push({
+        id: typeId,
+        name: `${name} (1)`,
+        icon: this.carneImg,
+        description: "Carne fresca obtida na caça.",
+        count: 1
+      });
+    }
+  }
+
   private confirmDialogueOption(): void {
     if (!this.activeTriggerNear) {
       this.isDialogueOpen = false;
@@ -443,6 +457,25 @@ export class Game {
             "Você encontrou uma espada antiga porém afiada.",
             "Pressione [Espaço] ou [F] para atacar!"
           ];
+          this.storyIndex = 0;
+          this.gameState = "STORY_DIALOGUE";
+        } else if (trigger.id.startsWith("carne_")) {
+          trigger.collected = true;
+
+          if (trigger.id.includes("cabra")) {
+            this.addMeatToInventory("carne_cabra", "Carne de Cabra");
+            this.storyQueue = ["Você coletou Carne de Cabra!"];
+          } else if (trigger.id.includes("raposa")) {
+            this.addMeatToInventory("carne_raposa", "Carne de Raposa");
+            this.storyQueue = ["Você coletou Carne de Raposa!"];
+          } else if (trigger.id.includes("lobo")) {
+            this.addMeatToInventory("carne_lobo", "Carne de Lobo");
+            this.storyQueue = ["Você coletou Carne de Lobo!"];
+          } else if (trigger.id.includes("humano")) {
+            this.addMeatToInventory("carne_humano", "Carne Humana");
+            this.storyQueue = ["Você coletou Carne Humana!"];
+          }
+
           this.storyIndex = 0;
           this.gameState = "STORY_DIALOGUE";
         } else {
@@ -482,12 +515,19 @@ export class Game {
             this.gameState = "STORY_DIALOGUE";
           }
         } else if (trigger.id === "cathedral_door") {
-          this.storyQueue = [
-            "As portas maciças da catedral estão trancadas por dentro.",
-            "Um ar gélido e antigo escorre pela fresta da madeira..."
-          ];
-          this.storyIndex = 0;
-          this.gameState = "STORY_DIALOGUE";
+          if (this.hunterBoss.isSurrendered) {
+            // Porta destrancada após derrotar o Caçador!
+            this.currentMapKey = "prologue_3";
+            this.player.x = 380;
+            this.player.y = 700;
+          } else {
+            this.storyQueue = [
+              "As portas maciças da catedral estão trancadas por dentro.",
+              "Um ar gélido e antigo escorre pela fresta da madeira..."
+            ];
+            this.storyIndex = 0;
+            this.gameState = "STORY_DIALOGUE";
+          }
         }
       }
     }
@@ -594,13 +634,27 @@ export class Game {
       return;
     }
 
-    // --- TRANSIÇÕES DO PRÓLOGO (Aldeia <-> Catedral) ---
-    // (MANTIDA EXATAMENTE IGUAL CONFORME O ORIGINAL)
-    if (this.currentMapKey === "prologue_1") {
-      if (this.player.y <= 10) this.player.y = 10;
-      if (this.player.y >= this.canvas.height - this.player.height - 10) {
-        this.player.y = this.canvas.height - this.player.height - 10;
+    // --- TRANSIÇÃO DO INTERIOR DA CATEDRAL ---
+    if (this.currentMapKey === "prologue_3") {
+      // Saída pela porta inferior da catedral
+      if (this.player.y > 720) {
+        this.currentMapKey = "prologue_2";
+        this.player.x = 480;
+        this.player.y = 300;
       }
+      return;
+    }
+
+    // --- TRANSIÇÕES DO PRÓLOGO (Aldeia <-> Catedral <-> Clareira de Caça) ---
+    if (this.currentMapKey === "prologue_1") {
+      if (this.player.y >= this.canvas.height - this.player.height - 10) {
+        this.currentMapKey = "prologue_hunting";
+        this.player.x = 400 - this.player.width / 2;
+        this.player.y = 35;
+        return;
+      }
+
+      if (this.player.y <= 10) this.player.y = 10;
 
       if (this.player.x <= 10) {
         this.currentMapKey = "prologue_2";
@@ -622,6 +676,21 @@ export class Game {
         this.player.x = 80;
       } else if (this.player.x <= 10) {
         this.player.x = 10;
+      }
+      return;
+    }
+
+    if (this.currentMapKey === "prologue_hunting") {
+      if (this.player.y <= 10) {
+        this.currentMapKey = "prologue_1";
+        this.player.x = 380;
+        this.player.y = this.canvas.height - this.player.height - 65;
+      } else if (this.player.y >= this.canvas.height - this.player.height - 10) {
+        this.player.y = this.canvas.height - this.player.height - 10;
+      }
+      if (this.player.x <= 10) this.player.x = 10;
+      if (this.player.x >= this.canvas.width - this.player.width - 10) {
+        this.player.x = this.canvas.width - this.player.width - 10;
       }
       return;
     }
@@ -835,7 +904,6 @@ export class Game {
     const boxX = (this.canvas.width - boxWidth) / 2;
     const boxY = 600;
 
-    // Fundo da caixa de diálogo
     this.ctx.fillStyle = "rgba(12, 10, 10, 0.96)";
     this.ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
     this.ctx.strokeStyle = "#d4af37";
@@ -871,7 +939,6 @@ export class Game {
       return;
     }
 
-    // Moldura do Retrato
     const portraitSize = 120;
     const portraitX = boxX + 20;
     const portraitY = boxY + 20;
@@ -882,7 +949,6 @@ export class Game {
     this.ctx.lineWidth = 2;
     this.ctx.strokeRect(portraitX, portraitY, portraitSize, portraitSize);
 
-    // Retrato do Caçador
     let portraitDrawn = false;
     if (this.hunterBoss.portraitImg.complete && this.hunterBoss.portraitImg.naturalWidth > 0) {
       const img = this.hunterBoss.portraitImg;
@@ -900,7 +966,6 @@ export class Game {
       this.ctx.fillText("CAÇADOR", portraitX + portraitSize / 2, portraitY + portraitSize / 2);
     }
 
-    // Nome do NPC
     const textStartX = portraitX + portraitSize + 20;
     this.ctx.fillStyle = "#ffd700";
     this.ctx.font = "bold 17px Georgia, serif";
@@ -913,7 +978,6 @@ export class Game {
     this.ctx.lineTo(boxX + boxWidth - 20, boxY + 46);
     this.ctx.stroke();
 
-    // Fala do Caçador
     this.ctx.fillStyle = "#f0e6d2";
     this.ctx.font = "15px Georgia, serif";
 

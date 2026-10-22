@@ -27,7 +27,10 @@ export class World {
       { id: "0,3", src: "/assets/map4.png" },
       { id: "house_interior", src: "/assets/house_interior.png" },
       { id: "prologue_1", src: "/assets/Aldeia Corrompida Sob o Castelo.png" },
-      { id: "prologue_2", src: "/assets/Catedral Gótica ao Luar.png" }
+      { id: "prologue_2", src: "/assets/Catedral Gótica ao Luar.png" },
+      { id: "prologue_hunting", src: "/assets/Clareira Sombria em Floresta Pixel Art.png" },
+      // Interior da Catedral com o Coração Sagrado
+      { id: "prologue_3", src: "/assets/Coração Sagrado na Catedral Sombria.png" }
     ];
 
     mapsToLoad.forEach((mapInfo) => {
@@ -88,15 +91,37 @@ export class World {
       collected: false
     });
 
-    // Ponto de interação na porta da Catedral no Prólogo
     this.triggers.push({
       id: "cathedral_door",
       mapKey: "prologue_2",
       x: 500,
       y: 260,
-      title: "Examinar Porta da Catedral",
+      title: "Entrar na Catedral",
       type: "door_enter"
     });
+
+    // --- CORAÇÃO SAGRADO NO ALTAR DA CATEDRAL (prologue_3) ---
+    this.triggers.push({
+      id: "heart_cathedral_altar",
+      mapKey: "prologue_3",
+      x: 400,
+      y: 220,
+      title: "Pegar Coração Sagrado",
+      type: "item",
+      collected: false
+    });
+
+    // --- CARNES ESPALHADAS NA CLAREIRA DE CAÇA (prologue_hunting) ---
+    this.triggers.push(
+      { id: "carne_cabra_1", mapKey: "prologue_hunting", x: 180, y: 220, title: "Carne de Cabra", type: "item", collected: false },
+      { id: "carne_cabra_2", mapKey: "prologue_hunting", x: 550, y: 180, title: "Carne de Cabra", type: "item", collected: false },
+      { id: "carne_raposa_1", mapKey: "prologue_hunting", x: 280, y: 480, title: "Carne de Raposa", type: "item", collected: false },
+      { id: "carne_raposa_2", mapKey: "prologue_hunting", x: 620, y: 350, title: "Carne de Raposa", type: "item", collected: false },
+      { id: "carne_lobo_1", mapKey: "prologue_hunting", x: 420, y: 280, title: "Carne de Lobo", type: "item", collected: false },
+      { id: "carne_lobo_2", mapKey: "prologue_hunting", x: 150, y: 620, title: "Carne de Lobo", type: "item", collected: false },
+      { id: "carne_humano_1", mapKey: "prologue_hunting", x: 680, y: 600, title: "Carne Humana", type: "item", collected: false },
+      { id: "carne_humano_2", mapKey: "prologue_hunting", x: 350, y: 680, title: "Carne Humana", type: "item", collected: false }
+    );
   }
 
   public getObstacles(mapKey: string): Rect[] {
@@ -134,27 +159,49 @@ export class World {
       ];
     }
 
-    // --- ALDEIA CORROMPIDA (prologue_1) ---
     if (mapKey === "prologue_1") {
       return [
-        { x: 680, y: 0, width: 120, height: 800 }, // Muralha da direita
-        { x: 100, y: 100, width: 180, height: 130 },
+        { x: 680, y: 0, width: 120, height: 800 },
+        { x: 60, y: 100, width: 180, height: 130 },
         { x: 380, y: 20, width: 140, height: 130 },
-        // A colisão da borda esquerda (x = 0 a 80) foi totalmente removida para permitir a troca de mapa
+        { x: 0, y: 340, width: 60, height: 120 },
         { x: 130, y: 440, width: 150, height: 130 },
-        { x: 100, y: 640, width: 170, height: 140 },
+        { x: 50, y: 640, width: 170, height: 140 },
         { x: 420, y: 650, width: 160, height: 130 },
         { x: 430, y: 430, width: 80, height: 60 }
       ];
     }
 
-    // --- CAPELA / CATEDRAL GÓTICA (prologue_2) ---
     if (mapKey === "prologue_2") {
       return [
-        // Estrutura física da Catedral no topo
         { x: 250, y: 0, width: 500, height: 260 },
-        { x: 0, y: 0, width: 250, height: 180 }
-        // Removida a colisão da borda direita para garantir livre navegação de retorno ao prologue_1
+        { x: 0, y: 0, width: 250, height: 180 },
+        { x: 750, y: 0, width: 250, height: 180 }
+      ];
+    }
+
+    if (mapKey === "prologue_hunting") {
+      return [
+        { x: 0, y: 0, width: 80, height: 800 },
+        { x: 720, y: 0, width: 80, height: 800 },
+        { x: 0, y: 0, width: 300, height: 60 },
+        { x: 500, y: 0, width: 300, height: 60 },
+        { x: 0, y: 740, width: 800, height: 60 },
+        { x: 650, y: 60, width: 100, height: 90 },
+        { x: 60, y: 680, width: 120, height: 100 }
+      ];
+    }
+
+    // --- OBSTÁCULOS DO INTERIOR DA CATEDRAL (prologue_3) ---
+    if (mapKey === "prologue_3") {
+      return [
+        { x: 0, y: 0, width: 800, height: 180 },     // Altar e vitrais
+        { x: 0, y: 0, width: 80, height: 800 },       // Parede esquerda
+        { x: 720, y: 0, width: 80, height: 800 },     // Parede direita
+        { x: 120, y: 350, width: 220, height: 350 }, // Bancos esquerdos
+        { x: 460, y: 350, width: 220, height: 350 }, // Bancos direitos
+        { x: 0, y: 750, width: 330, height: 50 },      // Parede inferior esquerda
+        { x: 470, y: 750, width: 330, height: 50 }      // Parede inferior direita
       ];
     }
 
@@ -197,7 +244,12 @@ export class World {
   ): void {
     ctx.save();
 
-    if (mapKey === "prologue_1" || mapKey === "prologue_2") {
+    if (
+      mapKey === "prologue_1" ||
+      mapKey === "prologue_2" ||
+      mapKey === "prologue_hunting" ||
+      mapKey === "prologue_3"
+    ) {
       const particleCount = 12;
       for (let i = 0; i < particleCount; i++) {
         const speed = 0.02 + (i % 4) * 0.01;
@@ -276,6 +328,19 @@ export class World {
           ctx.moveTo(x - 6, y + 3);
           ctx.lineTo(x + 6, y + 3);
           ctx.stroke();
+        } else if (trigger.id.startsWith("carne_")) {
+          ctx.shadowColor = "#d4af37";
+          ctx.shadowBlur = 8 + Math.sin(animTime) * 4;
+
+          ctx.fillStyle = "#8b0000";
+          ctx.beginPath();
+          ctx.ellipse(x, y, 10, 7, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = "#ff6347";
+          ctx.beginPath();
+          ctx.ellipse(x - 2, y - 2, 4, 3, 0, 0, Math.PI * 2);
+          ctx.fill();
         } else {
           ctx.shadowColor = "#ff2a55";
           ctx.shadowBlur = 12 + Math.sin(animTime) * 6;
@@ -283,7 +348,7 @@ export class World {
           ctx.fillStyle = "#ff1a4a";
           ctx.beginPath();
           ctx.arc(x - size / 2, y - size / 2, size / 2, Math.PI, 0, false);
-          ctx.arc(x + size / 2, y - size / 2, size / 4, Math.PI, 0, false);
+          ctx.arc(x + size / 2, y - size / 2, size / 2, Math.PI, 0, false);
           ctx.lineTo(x, y + size);
           ctx.closePath();
           ctx.fill();
